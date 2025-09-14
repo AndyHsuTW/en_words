@@ -1,0 +1,100 @@
+import argparse
+import os
+from . import utils
+
+
+def make(args: argparse.Namespace) -> int:
+    item = {
+        "letters": args.letters,
+        "word_en": args.word_en,
+        "word_zh": args.word_zh,
+        "image_path": args.image,
+        "music_path": args.music,
+        "countdown_sec": args.countdown,
+        "reveal_hold_sec": args.reveal_hold,
+    }
+    out = args.out
+    res = utils.render_video_stub(
+        item,
+        out,
+        dry_run=args.dry_run,
+        use_moviepy=getattr(args, "use_moviepy", False),
+    )
+    print(res)
+    return 0 if res.get("status") in ("ok", "dry-run") else 1
+
+
+def batch(args: argparse.Namespace) -> int:
+    data = utils.load_json(args.json)
+    errors = utils.validate_schema(data)
+    if errors:
+        for e in errors:
+            print("SCHEMA-ERROR:", e)
+        return 2
+    summary = {"ok": 0, "skipped": 0, "errors": []}
+    for item in data:
+        assets = utils.check_assets(item)
+        if not assets["image_exists"]:
+            print("WARNING: image missing for", item.get("word_en"))
+        out_path = os.path.join(args.outdir, f"{item['word_en']}.mp4")
+        try:
+            res = utils.render_video_stub(
+                item,
+                out_path,
+                dry_run=args.dry_run,
+                use_moviepy=getattr(args, "use_moviepy", False),
+            )
+            if res.get("status") == "ok":
+                summary["ok"] += 1
+            else:
+                summary["skipped"] += 1
+        except Exception as e:
+            summary["errors"].append(str(e))
+    print(summary)
+    return 0
+
+
+def build_parser():
+    p = argparse.ArgumentParser(prog="spellvid")
+    sub = p.add_subparsers(dest="cmd")
+
+    p_make = sub.add_parser("make")
+    p_make.add_argument("--letters")
+    p_make.add_argument("--word-en", dest="word_en")
+    p_make.add_argument("--word-zh", dest="word_zh")
+    p_make.add_argument("--image", dest="image")
+    p_make.add_argument("--music", dest="music")
+    p_make.add_argument("--countdown", type=int, dest="countdown", default=10)
+    p_make.add_argument(
+        "--reveal-hold", type=int, dest="reveal_hold", default=5
+    )
+    p_make.add_argument("--out", dest="out", default="out/output.mp4")
+    p_make.add_argument("--dry-run", action="store_true", dest="dry_run")
+    p_make.add_argument(
+        "--use-moviepy", action="store_true", dest="use_moviepy"
+    )
+
+    p_batch = sub.add_parser("batch")
+    p_batch.add_argument("--json")
+    p_batch.add_argument("--outdir", default="out")
+    p_batch.add_argument("--dry-run", action="store_true", dest="dry_run")
+    p_batch.add_argument(
+        "--use-moviepy", action="store_true", dest="use_moviepy"
+    )
+
+    return p
+
+
+def main(argv=None):
+    p = build_parser()
+    args = p.parse_args(argv)
+    if args.cmd == "make":
+        return make(args)
+    if args.cmd == "batch":
+        return batch(args)
+    p.print_help()
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

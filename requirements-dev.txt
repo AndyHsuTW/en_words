@@ -1,0 +1,7 @@
+moviepy
+numpy
+pydub
+jsonschema
+opencv-python
+pytest
+pytest-cov

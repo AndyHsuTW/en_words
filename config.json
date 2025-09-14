@@ -1,0 +1,21 @@
+[
+	{
+		"letters": "Aa",
+		"word_en": "Arm",
+		"word_zh": "手臂",
+		"image_path": "assets/arm.png",
+		"music_path": "assets/arm_20s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 10
+	},
+	
+	{
+		"letters": "Bb",
+		"word_en": "Ball",
+		"word_zh": "球",
+		"image_path": "assets/ball.png",
+		"music_path": "assets/ball_20s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 10
+	}
+]
