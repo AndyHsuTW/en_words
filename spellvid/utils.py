@@ -147,6 +147,7 @@ def _make_text_imageclip(
     bg=None,
     duration: float = None,
     prefer_cjk: bool = False,
+    extra_bottom: int = 0,
 ):
     """Render text with Pillow and return a MoviePy ImageClip.
 
@@ -164,13 +165,17 @@ def _make_text_imageclip(
     pad_y = max(8, font_size // 6)   # increased padding
     # allow caller to request timer-specific extra bottom safe margin via
     # passing bg=(0,0,0) conventionally for timer usage; default margin 0
-    bottom_safe_margin = 0
+    # allow caller to request an extra bottom safe margin; preserve the
+    # existing heuristic where a black bg indicates timer usage and needs
+    # additional margin. Caller may pass `extra_bottom` (e.g. reveal safe
+    # margin) to reserve space beneath glyphs for underlines.
+    bottom_safe_margin = int(extra_bottom or 0)
     if bg is not None and isinstance(bg, tuple) and len(bg) == 3:
         # heuristics: treat black bg callsites (timer) as needing extra bottom
-        # margin to avoid glyph descent clipping. Use a larger safe margin to
-        # avoid asymmetric padding seen on some system fonts.
+        # margin to avoid glyph descent clipping. Keep this on top of
+        # any extra_bottom requested by the caller.
         if bg == (0, 0, 0):
-            bottom_safe_margin = 32
+            bottom_safe_margin += 32
 
     img_w = int(w + pad_x * 2)
     img_h = int(h + pad_y * 2 + bottom_safe_margin)
@@ -408,8 +413,13 @@ def compute_layout_bboxes(
         # match _make_text_imageclip padding so predicted box equals rendered
         pad_x = max(12, reveal_font_size // 6)
         pad_y = max(8, reveal_font_size // 6)
+        # reserve extra bottom space inside the reveal image so underlines
+        # can be drawn beneath the glyphs without overlapping. This must
+        # mirror the extra_bottom used when creating reveal ImageClips.
+        reveal_extra_bottom = 32
         img_w = int(rw + pad_x * 2)
-        img_h = int(rh + pad_y * 2)
+        img_h = int(rh + pad_y * 2 + reveal_extra_bottom)
+
         # For headless layout calculations we should return the reveal box
         # x as an absolute coordinate in the video frame (centered). The
         # renderer composes the reveal ImageClip centered on the video
@@ -445,7 +455,9 @@ def compute_layout_bboxes(
             # avoid zero-division
             seg_w = max(1, inner_w // num_letters)
             underline_h = 4
-            underline_margin_bottom = 8
+            # leave a slightly larger margin between glyph baseline and
+            # underline so they don't overlap across fonts
+            underline_margin_bottom = 12
             underlines = []
             # left padding used when constructing the image in
             # _make_text_imageclip
@@ -459,10 +471,21 @@ def compute_layout_bboxes(
                     uw = seg_w
                 else:
                     uw = max(1, (pad_x + inner_w) - local_ux)
-                # y relative to reveal image
-                local_uy = (
-                    img_h - pad_y - underline_margin_bottom - underline_h
-                )
+                # y relative to reveal image: prefer placing underline
+                # inside the reserved extra-bottom area so it won't overlap
+                # drawn glyph pixels. Compute two candidates and choose the
+                # lower (visually further down) one.
+                candidate_from_text = pad_y + rh + underline_margin_bottom
+                # start of the reserved extra bottom zone
+                extra_zone_start = img_h - reveal_extra_bottom
+                # prefer placing underline inside extra zone (with small
+                # inset), otherwise fall back to candidate_from_text
+                # add a small inset into the extra zone to avoid touching
+                # antialiased glyph pixels
+                local_uy = max(candidate_from_text, extra_zone_start + 6)
+                # ensure underline fits inside image
+                if local_uy + underline_h > img_h:
+                    local_uy = max(0, img_h - underline_h)
                 # keep underline coords relative to the reveal image.
                 # The renderer composes the reveal image at absolute
                 # position r_box['x']/['y'] and will add those offsets
@@ -740,8 +763,11 @@ def render_video_moviepy(
         safe_bottom_margin = 32
         for idx in range(1, n + 1):
             sub = word_en[:idx]
+            # reserve extra bottom space inside reveal image so underlines
+            # can be drawn below glyphs without overlapping.
             rc = _make_text_imageclip(
-                text=sub, font_size=128, color=(0, 0, 0), duration=per
+                text=sub, font_size=128, color=(0, 0, 0), duration=per,
+                extra_bottom=32,
             )
             # compute a y position so the reveal clip sits above the bottom
             # by safe_bottom_margin to avoid glyph descent clipping

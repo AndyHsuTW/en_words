@@ -116,3 +116,70 @@ def test_reveal_underlines_drawn_in_video(tmp_path):
         assert found_dark
     except Exception:
         return
+
+
+def test_reveal_underlines_do_not_overlap_text_headless():
+    """Headless check: render the full reveal text image and ensure the
+    computed underline rectangles fall on background (no glyph pixels).
+
+    This detects cases where underline y-coordinates are too high and
+    intersect the letters themselves.
+    """
+    item = _sample_item()
+
+    # get computed layout
+    boxes = sv_utils.compute_layout_bboxes(item)
+    rbox = boxes.get("reveal")
+    underlines = boxes.get("reveal_underlines", [])
+    if not rbox or not underlines:
+        pytest.skip("no reveal or underlines computed")
+
+    # render full word (headless) using internal helper
+    mod = __import__("spellvid.utils", fromlist=["_make_text_imageclip"])
+    make_clip = getattr(mod, "_make_text_imageclip", None)
+    if make_clip is None:
+        pytest.skip("_make_text_imageclip not available")
+
+    # render using the same extra_bottom reserved by compute_layout_bboxes
+    clip = make_clip(
+        item["word_en"], font_size=rbox.get("font_size", 128), extra_bottom=32
+    )
+    try:
+        frame = clip.get_frame(0)
+    except Exception:
+        pytest.skip("could not get frame from text clip")
+
+    import numpy as _np
+
+    # frame is the reveal image as rendered by Pillow: check each underline
+    # region inside that image: it should contain only background (transparent
+    # or very bright) pixels; any dark pixels indicate overlap with glyphs.
+    # The clip returned by _make_text_imageclip includes padding used by
+    # compute_layout_bboxes, so underline local coords map directly into frame.
+    found_overlap = False
+    for ul in underlines:
+        x0 = int(ul.get("x", 0))
+        y0 = int(ul.get("y", 0))
+        x1 = min(frame.shape[1], x0 + max(1, int(ul.get("w", 1))))
+        y1 = min(frame.shape[0], y0 + max(1, int(ul.get("h", 1))))
+        if x1 <= x0 or y1 <= y0:
+            continue
+        seg = frame[y0:y1, x0:x1]
+        # consider pixel 'ink' if mean across RGB is dark (< 250) or alpha > 0
+        try:
+            # handle RGBA or RGB
+            if seg.shape[2] == 4:
+                alpha = seg[..., 3]
+                rgb = seg[..., :3]
+            else:
+                alpha = None
+                rgb = seg
+            mean_brightness = _np.mean(rgb)
+            if (alpha is not None and _np.mean(alpha) > 0) or mean_brightness < 250:
+                found_overlap = True
+                break
+        except Exception:
+            # best-effort; if we can't analyze, skip
+            pytest.skip("unable to analyze reveal image pixels")
+
+    assert not found_overlap, "Underline overlaps reveal text in headless render"
