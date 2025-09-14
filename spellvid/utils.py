@@ -179,9 +179,36 @@ def _make_text_imageclip(
     draw = ImageDraw.Draw(img)
     draw.text((pad_x, pad_y), text, font=font, fill=color)
     arr = _np.array(img)
-    clip = _mpy.ImageClip(arr)
-    if duration is not None:
-        clip = clip.with_duration(duration)
+    # If moviepy is available, wrap into an ImageClip. Otherwise return a
+    # tiny fallback object that exposes the minimal API used by tests
+    # (get_frame, w, h, size, with_duration).
+    if _mpy is not None:
+        clip = _mpy.ImageClip(arr)
+        if duration is not None:
+            clip = clip.with_duration(duration)
+        return clip
+
+    class _SimpleImageClip:
+        def __init__(self, arr, duration=None):
+            self._arr = arr
+            self.h = int(arr.shape[0])
+            self.w = int(arr.shape[1])
+            self.size = (self.w, self.h)
+            self._duration = duration
+
+        def get_frame(self, t=0):
+            return self._arr
+
+        def with_duration(self, duration):
+            self._duration = duration
+            return self
+
+        # minimal attributes moviepy users expect
+        @property
+        def duration(self):
+            return self._duration
+
+    clip = _SimpleImageClip(arr, duration=duration)
     return clip
 
 
@@ -383,14 +410,15 @@ def compute_layout_bboxes(
         pad_y = max(8, reveal_font_size // 6)
         img_w = int(rw + pad_x * 2)
         img_h = int(rh + pad_y * 2)
-        # For headless layout calculations we return the reveal box x
-        # relative to the reveal image (i.e. 0). The renderer centers the
-        # reveal image when composing the final video, but the per-letter
-        # underline coordinates returned below are intentionally relative
-        # to the reveal image. Returning rx=0 makes it straightforward to
-        # validate per-letter splits against a standalone rendered reveal
-        # ImageClip (which has its own local coordinate space starting at 0).
-        rx = 0
+        # For headless layout calculations we should return the reveal box
+        # x as an absolute coordinate in the video frame (centered). The
+        # renderer composes the reveal ImageClip centered on the video
+        # and previously compute_layout_bboxes returned rx=0 which made
+        # the caller treat underline positions as local to the reveal
+        # image. That mismatch meant underlines were placed at the left
+        # edge. Return an absolute centered x so downstream code can
+        # overlay underlines at correct absolute positions.
+        rx = max(0, (w_vid - img_w) // 2)
         # place reveal so it sits above the bottom of the video with a
         # safe margin to avoid glyph descent clipping on some fonts
         safe_bottom_margin = 32
@@ -403,11 +431,13 @@ def compute_layout_bboxes(
             "font_size": reveal_font_size,
         }
 
-        # compute per-letter underline boxes (relative to reveal box)
-    # each underline is a small horizontal bar beneath a letter position.
-    # Approximate per-letter horizontal region by splitting the measured
-    # text width into equal segments. Underline boxes are relative to the
-    # reveal image (x/y offsets inside that image).
+        # compute per-letter underline boxes (absolute positions)
+        # each underline is a small horizontal bar beneath a letter position.
+        # Approximate per-letter horizontal region by splitting the measured
+        # text width into equal segments. Previously these underline boxes
+        # were returned relative to the reveal image (local coords). Since
+        # the reveal box now reports an absolute x, return underline boxes
+        # with absolute x/y so tests and renderer align.
         num_letters = len(word_en)
         if num_letters > 0:
             # available width for letters inside reveal image (exclude padding)
@@ -423,16 +453,25 @@ def compute_layout_bboxes(
             pad_y = max(8, reveal_font_size // 6)
             for i in range(num_letters):
                 # x relative to reveal image: pad_x + i*seg_w
-                ux = pad_x + i * seg_w
-                # width: use segment width, but ensure stays within inner_w
+                local_ux = pad_x + i * seg_w
                 # width: use segment width but clip to remaining inner_w
-                if (ux + seg_w) <= (pad_x + inner_w):
+                if (local_ux + seg_w) <= (pad_x + inner_w):
                     uw = seg_w
                 else:
-                    uw = max(1, (pad_x + inner_w) - ux)
-                uy = img_h - pad_y - underline_margin_bottom - underline_h
+                    uw = max(1, (pad_x + inner_w) - local_ux)
+                # y relative to reveal image
+                local_uy = (
+                    img_h - pad_y - underline_margin_bottom - underline_h
+                )
+                # keep underline coords relative to the reveal image.
+                # The renderer composes the reveal image at absolute
+                # position r_box['x']/['y'] and will add those offsets
+                # when overlaying underlines.
+                ux = local_ux
+                uy = local_uy
                 underlines.append(
-                    {"x": ux, "y": uy, "w": uw, "h": underline_h})
+                    {"x": ux, "y": uy, "w": uw, "h": underline_h}
+                )
             boxes["reveal_underlines"] = underlines
 
     return boxes

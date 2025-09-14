@@ -14,4 +14,4 @@ if (Test-Path $venvPath) {
 }
 
 Write-Host "Running pytest..."
-pytest -q
+pytest -q -rs

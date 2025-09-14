@@ -12,8 +12,13 @@ def test_reveal_underlines_drawn_in_video(tmp_path):
 
     Skip when MoviePy or ffmpeg not available.
     """
-    if not getattr(utils, "_HAS_MOVIEPY", False):
-        pytest.skip("moviepy not available")
+    has_mpy = getattr(utils, "_HAS_MOVIEPY", False)
+    # allow fallback to imageio (ffmpeg backend) if moviepy not installed
+    if not has_mpy:
+        try:
+            import imageio  # type: ignore
+        except Exception:
+            pytest.skip("moviepy not available and no imageio fallback")
 
     # ensure ffmpeg exists for writing
     ffmpeg = os.environ.get("IMAGEIO_FFMPEG_EXE") or shutil.which("ffmpeg")
@@ -36,19 +41,50 @@ def test_reveal_underlines_drawn_in_video(tmp_path):
         pytest.skip(f"renderer did not produce output: {res}")
 
     # open the produced file and grab a frame in the reveal period
-    try:
-        from moviepy.editor import VideoFileClip
-
-        clip = VideoFileClip(out)
-    except Exception as e:
-        pytest.skip(f"cannot open produced video: {e}")
-
-    # choose a time after countdown (countdown=1) to inspect reveal
     t = 1.5
-    try:
-        frame = clip.get_frame(t)
-    except Exception as e:
-        pytest.skip(f"cannot extract frame: {e}")
+    frame = None
+    if has_mpy:
+        try:
+            # moviepy installers may expose VideoFileClip on different
+            # locations. Try common import locations and fall back to
+            # attributes on top-level moviepy module.
+            try:
+                from moviepy.editor import VideoFileClip
+            except Exception:
+                import moviepy as _mp
+
+                VideoFileClip = getattr(_mp, "VideoFileClip", None)
+                if VideoFileClip is None:
+                    # some installations may put it under moviepy.video
+                    try:
+                        from moviepy.video.io.VideoFileClip import VideoFileClip
+                    except Exception:
+                        raise
+
+            clip = VideoFileClip(out)
+            frame = clip.get_frame(t)
+        except Exception as e:
+            pytest.skip(f"cannot open produced video with moviepy: {e}")
+    else:
+        # fallback: try imageio/ffmpeg reader
+        try:
+            import imageio  # type: ignore
+
+            reader = imageio.get_reader(out, "ffmpeg")
+            meta = reader.get_meta_data()
+            fps = int(meta.get("fps", 25))
+            # compute index for t seconds; clamp if reader doesn't provide
+            # count
+            try:
+                count = reader.count_frames()
+            except Exception:
+                count = None
+            idx = int(t * fps)
+            if count is not None:
+                idx = min(idx, max(0, count - 1))
+            frame = reader.get_data(idx)
+        except Exception as e:
+            pytest.skip(f"cannot open produced video with imageio: {e}")
 
     # load layout metadata and check dark pixels inside underline boxes
     boxes = utils.compute_layout_bboxes(item)
@@ -82,7 +118,6 @@ def test_reveal_underlines_drawn_in_video(tmp_path):
             found = True
             break
 
-    assert found, "no dark underline pixels found in reveal region; underlines likely missing"
     assert found, (
         "no dark underline pixels found in reveal region; "
         "underlines likely missing"
