@@ -36,6 +36,12 @@ def _duration_seconds(path):
 
 
 def test_concat_two_items(tmp_path):
+    """整合測試：確認將多個單項輸出合併後的影片長度約等於各單項長度總和。
+
+    測試會分別渲染兩個單獨項目以取得各自輸出長度，然後呼叫批次合併流程並
+    比對合併檔案的總長度是否與個別長度總和相符（允許小幅容差）。
+    若系統缺少 ffprobe，測試會跳過。
+    """
     ffprobe = _find_ffprobe()
     if not ffprobe:
         # skip test when ffprobe not available in environment

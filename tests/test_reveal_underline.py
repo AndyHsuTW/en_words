@@ -23,6 +23,7 @@ def _sample_item() -> Dict[str, Any]:
 
 
 def test_reveal_underlines_boxes_exist_and_count_matches_letters():
+    """確認 compute_layout_bboxes 會為 reveal 產生對應的 underline boxes，且數量與字數一致。"""
     item = _sample_item()
     boxes = sv_utils.compute_layout_bboxes(item)
     assert "reveal" in boxes
@@ -32,6 +33,7 @@ def test_reveal_underlines_boxes_exist_and_count_matches_letters():
 
 
 def test_reveal_underlines_align_with_letter_pixels_or_boxes():
+    """檢查 underline 的水平中心位置大致對齊該字元所在的段區（headless 近似檢查）。"""
     item = _sample_item()
     boxes = sv_utils.compute_layout_bboxes(item)
     underlines = boxes.get("reveal_underlines")
@@ -64,6 +66,7 @@ def test_reveal_underlines_align_with_letter_pixels_or_boxes():
 
 
 def test_reveal_underlines_drawn_in_video(tmp_path):
+    """整合檢查：在產生的影片影格中能找到在 compute_layout_bboxes 計算出的 underline（粗略檢驗）。"""
     item = _sample_item()
     out = str(tmp_path / "out.mp4")
 
@@ -175,11 +178,14 @@ def test_reveal_underlines_do_not_overlap_text_headless():
                 alpha = None
                 rgb = seg
             mean_brightness = _np.mean(rgb)
-            if (alpha is not None and _np.mean(alpha) > 0) or mean_brightness < 250:
+            if (alpha is not None and _np.mean(alpha) > 0) or \
+               mean_brightness < 250:
                 found_overlap = True
                 break
         except Exception:
             # best-effort; if we can't analyze, skip
             pytest.skip("unable to analyze reveal image pixels")
 
-    assert not found_overlap, "Underline overlaps reveal text in headless render"
+    assert not found_overlap, (
+        "Underline overlaps reveal text in headless render"
+    )

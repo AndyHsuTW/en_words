@@ -148,6 +148,7 @@ def _make_text_imageclip(
     duration: float = None,
     prefer_cjk: bool = False,
     extra_bottom: int = 0,
+    fixed_size: tuple | None = None,
 ):
     """Render text with Pillow and return a MoviePy ImageClip.
 
@@ -179,10 +180,35 @@ def _make_text_imageclip(
 
     img_w = int(w + pad_x * 2)
     img_h = int(h + pad_y * 2 + bottom_safe_margin)
+    # If caller requests a fixed canvas size (w,h), center the rendered
+    # text inside that canvas. This helps when rendering per-letter
+    # clips in a group so adding/removing letters doesn't change each
+    # clip's size and avoids downstream reflow in CompositeVideoClip.
+    if fixed_size is not None:
+        try:
+            fx_w, fx_h = int(fixed_size[0]), int(fixed_size[1])
+            # ensure fixed canvas at least as big as measured image
+            img_w = max(img_w, fx_w)
+            img_h = max(img_h, fx_h)
+            # align text to the same left/top origin used by the full
+            # reveal image so substrings don't change their left position
+            # relative to the fixed canvas. This keeps pad_x/pad_y as the
+            # drawing origin for all substrings.
+            offset_x = 0
+            offset_y = 0
+        except Exception:
+            offset_x = 0
+            offset_y = 0
+    else:
+        offset_x = 0
+        offset_y = 0
     bg_col = (255, 255, 255, 0) if bg is None else tuple(bg) + (255,)
     img = Image.new("RGBA", (img_w, img_h), bg_col)
     draw = ImageDraw.Draw(img)
-    draw.text((pad_x, pad_y), text, font=font, fill=color)
+    # draw text at pad + any centering offset
+    draw_x = pad_x + offset_x
+    draw_y = pad_y + offset_y
+    draw.text((draw_x, draw_y), text, font=font, fill=color)
     arr = _np.array(img)
     # If moviepy is available, wrap into an ImageClip. Otherwise return a
     # tiny fallback object that exposes the minimal API used by tests
@@ -463,14 +489,39 @@ def compute_layout_bboxes(
             # _make_text_imageclip
             pad_x = max(12, reveal_font_size // 6)
             pad_y = max(8, reveal_font_size // 6)
-            for i in range(num_letters):
-                # x relative to reveal image: pad_x + i*seg_w
-                local_ux = pad_x + i * seg_w
-                # width: use segment width but clip to remaining inner_w
-                if (local_ux + seg_w) <= (pad_x + inner_w):
-                    uw = seg_w
-                else:
-                    uw = max(1, (pad_x + inner_w) - local_ux)
+            # Introduce a small horizontal gap between adjacent underlines so
+            # they don't visually touch. Compute a gap as a fraction of the
+            # segment width but clamp to a few pixels to remain stable across
+            # small fonts. Center each underline inside its segment and reduce
+            # its width accordingly.
+            # Instead of equal segments, measure each glyph's actual width
+            # using Pillow so the underline centers under the glyph. This
+            # produces more accurate alignment especially for variable-width
+            # fonts. Keep a small horizontal gap between adjacent underlines.
+            try:
+                # get a PIL font similar to what renderer uses
+                pil_font = _find_system_font(False, reveal_font_size)
+                # measure each character
+                char_widths = []
+                for ch in word_en:
+                    cw, _ch_h = measure_text(ch, pil_font)
+                    char_widths.append(max(1, int(cw)))
+            except Exception:
+                # fallback: equal-width approximation
+                char_widths = [max(1, seg_w) for _ in range(num_letters)]
+
+            gap = max(4, seg_w // 10)
+            # compute the starting x of the first glyph relative to
+            # the reveal image. This mirrors how text is drawn at pad_x
+            cursor = pad_x
+            for i, ch_w in enumerate(char_widths):
+                seg_start = cursor
+                avail = min(ch_w, max(0, (pad_x + inner_w) - seg_start))
+                uw = max(1, avail - gap)
+                # center underline under the glyph box
+                local_ux = seg_start + max(0, (avail - uw) // 2)
+                # advance cursor by the glyph width (not by seg_w)
+                cursor += ch_w
                 # y relative to reveal image: prefer placing underline
                 # inside the reserved extra-bottom area so it won't overlap
                 # drawn glyph pixels. Compute two candidates and choose the
@@ -498,6 +549,29 @@ def compute_layout_bboxes(
             boxes["reveal_underlines"] = underlines
 
     return boxes
+
+
+def _make_fixed_letter_clip(
+    letter: str,
+    fixed_size: tuple,
+    font_size: int = 128,
+    color=(0, 0, 0),
+    duration: float = None,
+    prefer_cjk: bool = False,
+):
+    """Render a single letter centered on a fixed transparent canvas and
+    return an ImageClip. This ensures per-letter clips have identical
+    dimensions to avoid pushing other clips when they appear/disappear."""
+    # delegate to _make_text_imageclip which now supports fixed_size
+    return _make_text_imageclip(
+        text=letter,
+        font_size=font_size,
+        color=color,
+        duration=duration,
+        prefer_cjk=prefer_cjk,
+        extra_bottom=0,
+        fixed_size=fixed_size,
+    )
 
 
 def check_assets(item: Dict[str, Any]) -> Dict[str, bool]:
@@ -761,13 +835,37 @@ def render_video_moviepy(
         n = max(1, len(word_en))
         per = reveal / n
         safe_bottom_margin = 32
+        # Compute the full reveal image size once so every substring
+        # clip can be rendered on that fixed canvas. This avoids changing
+        # clip widths during the typewriter effect which would otherwise
+        # shift other positioned clips.
+        try:
+            full_rc = _make_text_imageclip(
+                text=word_en, font_size=128, color=(0, 0, 0),
+                extra_bottom=32, duration=1,
+            )
+            full_w = (
+                getattr(full_rc, "w", None)
+                or getattr(full_rc, "size", (None, None))[0]
+            )
+            full_h = (
+                getattr(full_rc, "h", None)
+                or getattr(full_rc, "size", (None, None))[1]
+            )
+            if full_w is None or full_h is None:
+                raise Exception("could not determine full reveal size")
+            fixed_canvas = (int(full_w), int(full_h))
+        except Exception:
+            # fallback to a reasonable fixed size based on font heuristics
+            fixed_canvas = (int(len(word_en) * 128 * 0.6) + 48, 128 + 48 + 32)
+
         for idx in range(1, n + 1):
             sub = word_en[:idx]
             # reserve extra bottom space inside reveal image so underlines
             # can be drawn below glyphs without overlapping.
             rc = _make_text_imageclip(
                 text=sub, font_size=128, color=(0, 0, 0), duration=per,
-                extra_bottom=32,
+                extra_bottom=32, fixed_size=fixed_canvas,
             )
             # compute a y position so the reveal clip sits above the bottom
             # by safe_bottom_margin to avoid glyph descent clipping
