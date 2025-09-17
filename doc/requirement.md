@@ -8,7 +8,7 @@
 **背景**：
 
 - SpellVid 是一款「面向開發者」的 **命令列（CLI）** 影片合成工具，用於製作英語拼字教學短片。
-- 畫面構成：左上英文字母、右上中文（含自動注音）、左側倒數計時、中間主圖（單字相關圖像）、倒數結束後於底部揭示英文單字。
+- 畫面構成：左上英文字母、右上中文（含自動注音）、左側倒數計時、中間主圖（單字相關圖像或影片）、倒數結束後於底部揭示英文單字。
 
 **利害關係人（Stakeholders）**：
 
@@ -244,7 +244,7 @@ Scenario: 批次生成（batch）
       "letters": {"type": "string", "description": "左上顯示之字母，例：\"I i\""},
       "word_en": {"type": "string", "description": "英文單字（底部揭示，首字母大寫）"},
       "word_zh": {"type": "string", "description": "中文（右上顯示，程式自動產生注音）"},
-      "image_path": {"type": "string", "description": "中央主圖檔路徑，缺檔時以白色底圖取代"},
+  "image_path": {"type": "string", "description": "中央主資產檔路徑（圖片或影片），缺檔時以白色底圖取代"},
       "music_path": {"type": "string", "description": "專屬 MP3 音樂，不循環"},
       "countdown_sec": {"type": "integer", "default": 10, "minimum": 1},
       "reveal_hold_sec": {"type": "integer", "default": 5, "minimum": 1},
@@ -299,7 +299,7 @@ spellvid batch --json data/words.json --outdir out --beep true --dry-run false
 - **Letters（左上）**：x=64, y=48，字級 160（`Segoe UI`）。
 - **Timer（左側黑底白字）**：x=64, y=420，框 220×120，字級 64，格式 `MM:SS`。
 - **Chinese+Zhuyin（右上）**：右上對齊（x=1920-64, y=64），中文字級 96（`Microsoft JhengHei`），注音字級 48，置於中文下方一行；多字以空格分隔。
-- **Image（中央）**：在 (x=320..1600, y=220..900) 的內容框內以 **contain** 等比縮放。
+- **Image / Video（中央）**：在 (x=320..1600, y=220..900) 的內容框內以 **contain** 等比縮放；若為影片，將影片裁切/縮放以置中並在輸出期間播放，以loop方式填滿時長。
 - **Answer（底部揭示）**：x=960, y=980（置中），字級 128，**typewriter** 動效。
 
 # 🔊 音訊策略

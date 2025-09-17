@@ -312,9 +312,32 @@ def zhuyin_for(text: str) -> str:
     Missing chars are skipped.
     """
     parts = []
-    for ch in text:
-        parts.append(_ZHUYIN_MAP.get(ch, ""))
-    return " ".join([p for p in parts if p])
+    # Prefer using pypinyin's Bopomofo output if available for broader coverage
+    try:
+        from pypinyin import pinyin, Style  # type: ignore
+        for ch in text:
+            if not ch.strip():
+                continue
+            try:
+                p = pinyin(
+                    ch,
+                    style=Style.BOPOMOFO,
+                    heteronym=False,
+                    errors='ignore',
+                )
+                if p and p[0] and p[0][0]:
+                    parts.append(p[0][0])
+                    continue
+            except Exception:
+                pass
+            # fallback to map if pypinyin didn't return anything
+            parts.append(_ZHUYIN_MAP.get(ch, ""))
+        return " ".join([p for p in parts if p])
+    except Exception:
+        # pypinyin not available; use small internal map
+        for ch in text:
+            parts.append(_ZHUYIN_MAP.get(ch, ""))
+        return " ".join([p for p in parts if p])
 
 
 def compute_layout_bboxes(
@@ -355,8 +378,9 @@ def compute_layout_bboxes(
     # Chinese + zhuyin (top-right)
     word_zh = item.get("word_zh", "")
     zhuyin = zhuyin_for(word_zh)
-    zh_text = word_zh + (" " + zhuyin if zhuyin else "")
-    if zh_text:
+    if word_zh:
+        # split zhuyin into groups per character (space-separated)
+        zh_groups = zhuyin.split() if zhuyin else []
         font_candidates = [
             r"C:\Windows\Fonts\msjh.ttf",
             r"C:\Windows\Fonts\msjhbd.ttf",
@@ -369,43 +393,95 @@ def compute_layout_bboxes(
             if os.path.isfile(p):
                 font_path = p
                 break
-        font_size = 64
+
+        # scale base font size up 1.5x to increase CJK/zhuyin visibility
+        base_font_size = 96
         try:
             if font_path:
-                pil_font = ImageFont.truetype(font_path, font_size)
+                ch_font = ImageFont.truetype(font_path, base_font_size)
             else:
-                pil_font = ImageFont.load_default()
-            lines = [word_zh, zhuyin] if zhuyin else [word_zh]
-            max_w = 0
-            total_h = 0
+                ch_font = ImageFont.load_default()
+
             padding = 8
-            for line in lines:
-                w, h = measure_text(line, pil_font)
-                if w > max_w:
-                    max_w = w
-                total_h += h + 4
-            img_w = max_w + padding * 2
-            img_h = total_h + padding * 2
+            total_w = 0
+            max_h = 0
+            for i, ch in enumerate(word_zh):
+                # measure CJK glyph
+                ch_w, ch_h = measure_text(ch, ch_font)
+                zh_grp = zh_groups[i] if i < len(zh_groups) else ""
+
+                # break zhuyin into tone vs main symbols so we can
+                # vertically center the main symbols and place tone
+                # marks centered on the whole zh column.
+                tone_marks = set(["ˊ", "ˇ", "ˋ", "˙"])
+                lines = list(zh_grp) if zh_grp else []
+                main_syms = [s for s in lines if s not in tone_marks]
+                tone_syms = [s for s in lines if s in tone_marks]
+
+                # choose a smaller zh font and iteratively reduce its size
+                # until the stacked main symbols fit within the CJK height.
+                n_main = max(
+                    1, (len(main_syms) if main_syms else len(lines)) or 1
+                )
+                # start with an estimate of zh size and shrink if necessary
+                zh_font_size = max(10, int(ch_h / n_main))
+                zh_w = 0
+                zh_h = 0
+                # tone_h not needed in render path
+                try:
+                    while True:
+                        try:
+                            zh_font = (
+                                ImageFont.truetype(font_path, zh_font_size)
+                                if font_path
+                                else ImageFont.load_default()
+                            )
+                        except Exception:
+                            zh_font = ImageFont.load_default()
+
+                        zh_w = 0
+                        zh_h = 0
+                        for sym in main_syms if main_syms else lines:
+                            sw, sh = measure_text(sym, zh_font)
+                            zh_w = max(zh_w, sw)
+                            zh_h += sh + 2
+
+                        if tone_syms:
+                            tw, th = measure_text(tone_syms[0], zh_font)
+
+                        # stop when fit or reached min size
+                        if zh_h <= ch_h or zh_font_size <= 10:
+                            break
+                        zh_font_size -= 1
+
+                except Exception:
+                    zh_w = zh_w or 0
+                    zh_h = zh_h or 0
+
+                # ensure column width accounts for bopomofo and small padding
+                col_w = ch_w + (zh_w if zh_w else 0) + padding
+                # fix column height to the CJK glyph height so green box
+                # won't exceed red box; stacked symbols were already scaled
+                # to fit within ch_h.
+                col_h = ch_h
+                total_w += col_w
+                max_h = max(max_h, col_h)
+
+            img_w = int(total_w + padding)
+            img_h = int(max_h + padding * 2)
         except Exception:
-            img_w = len(zh_text) * font_size // 2
-            img_h = font_size * 2
+            img_w = len(word_zh) * base_font_size // 2
+            img_h = base_font_size * 2
+
         pos_x = w_vid - 64 - img_w
         boxes["zh"] = {"x": pos_x, "y": 64, "w": img_w, "h": img_h}
-
-    # Timer bbox (first second position) - compute using the same format
-    # the renderer will use (mm:ss) based on item countdown to avoid
-    # underestimating size when digits change.
-    countdown = int(item.get("countdown_sec", 10))
-    sec_left = max(0, countdown)
-    mm = sec_left // 60
-    ss = sec_left % 60
-    timer_text = f"{mm:02d}:{ss:02d}"
     timer_font_size = 64
     try:
         # use the same font selection logic as _make_text_imageclip so
-        # measured size matches rendered image
+        # measured size matches rendered image. We don't have timer_text
+        # in this scope yet; measure a sample "00:00" string to estimate.
         timer_font = _find_system_font(False, timer_font_size)
-        tw, th = measure_text(timer_text, timer_font)
+        tw, th = measure_text("00:00", timer_font)
     except Exception:
         tw, th = timer_font_size, timer_font_size // 2
     # match _make_text_imageclip padding so predicted box
@@ -685,8 +761,19 @@ def render_video_moviepy(
         raise RuntimeError("MoviePy not available")
 
     countdown = int(item.get("countdown_sec", 10))
-    reveal = int(item.get("reveal_hold_sec", 5))
-    duration = float(countdown + reveal)
+    # reveal_hold_sec is now the time to hold AFTER the reveal completes
+    reveal_hold = int(item.get("reveal_hold_sec", 5))
+
+    # Word length affects total reveal time because each letter appears
+    # at a fixed interval (1 second per letter).
+    word_en = item.get("word_en", "")
+    n_for_timing = max(1, len(word_en))
+    # fixed per-letter interval (seconds)
+    per = 1.0
+    total_reveal_time = per * n_for_timing
+    # total video duration = countdown + time to reveal all letters
+    # plus post-reveal hold
+    duration = float(countdown + total_reveal_time + reveal_hold)
 
     if dry_run:
         return {"status": "dry-run", "out": out_path}
@@ -743,12 +830,10 @@ def render_video_moviepy(
         txt_letters = txt_letters.with_position((64, letters_y))
         clips.append(txt_letters)
 
-    # Chinese + zhuyin (top-right) — render via Pillow to ensure CJK support
+    # Chinese + zhuyin (top-right) — render per-character with vertical zhuyin
     word_zh = item.get("word_zh", "")
     zhuyin = zhuyin_for(word_zh)
-    zh_text = word_zh + (" " + zhuyin if zhuyin else "")
-    if zh_text:
-        # try common Windows font paths for CJK
+    if word_zh:
         font_candidates = [
             r"C:\Windows\Fonts\msjh.ttf",
             r"C:\Windows\Fonts\msjhbd.ttf",
@@ -765,35 +850,239 @@ def render_video_moviepy(
         try:
             from PIL import Image, ImageDraw, ImageFont
 
-            font_size = 64
+            # increase main CJK font size by 1.5x for clearer rendering
+            font_size = 96
             if font_path:
                 pil_font = ImageFont.truetype(font_path, font_size)
             else:
                 pil_font = ImageFont.load_default()
 
-            # measure text and create image
-            lines = [word_zh, zhuyin] if zhuyin else [word_zh]
-            padding = 8
-            max_w = 0
-            total_h = 0
-            for line in lines:
-                w, h = _measure_text_with_pil(line, pil_font)
-                if w > max_w:
-                    max_w = w
-                total_h += h + 4
+            # split zhuyin per character (space separated by zhuyin_for)
+            zh_groups = zhuyin.split() if zhuyin else []
 
-            img_w = max_w + padding * 2
-            img_h = total_h + padding * 2
+            # measure columns to compute starting x so columns are
+            # right-aligned
+            cols = []
+            total_w = 0
+            padding = 8
+            for i, ch in enumerate(word_zh):
+                ch_w, ch_h = _measure_text_with_pil(ch, pil_font)
+                zh_grp = zh_groups[i] if i < len(zh_groups) else ""
+                zh_lines = list(zh_grp) if zh_grp else []
+                zh_w = 0
+                zh_h = 0
+                for sym in zh_lines:
+                    sw, sh = _measure_text_with_pil(sym, pil_font)
+                    zh_w = max(zh_w, sw)
+                    zh_h += sh + 2
+
+                col_w = ch_w + (zh_w if zh_w else 0) + padding
+                col_h = max(ch_h, zh_h)
+                cols.append((ch, zh_lines, col_w, col_h))
+                total_w += col_w
+
+            img_w = int(total_w + padding)
+            # create a single wide transparent image for the whole zh region
+            img_h = int(max([c[3] for c in cols]) + padding * 2) if cols else 0
             img = Image.new("RGBA", (img_w, img_h), (255, 255, 255, 0))
             draw = ImageDraw.Draw(img)
-            y = padding
-            for line in lines:
-                draw.text((padding, y), line, font=pil_font, fill=(0, 0, 0))
-                _, line_h = _measure_text_with_pil(line, pil_font)
-                y += line_h + 4
 
-            # convert to clip
-            # convert pillow image to numpy array
+            # draw columns left-to-right but we'll position this image anchored
+            # to the right when composing (so columns appear at the right side)
+            cursor_x = padding
+            cursor_y = padding
+            # keep coords for optional overlay/debugging
+            overlay_boxes = []
+            for ch, zh_lines, col_w, col_h in cols:
+                # draw the main CJK char at top-left of its column
+                draw.text(
+                    (cursor_x, cursor_y), ch, font=pil_font, fill=(0, 0, 0)
+                )
+                ch_w, ch_h = _measure_text_with_pil(ch, pil_font)
+
+                # separate main bopomofo symbols from tone marks
+                tone_marks = set(["ˊ", "ˇ", "ˋ", "˙"])
+                lines = zh_lines or []
+                main_syms = [s for s in lines if s not in tone_marks]
+                tone_syms = [s for s in lines if s in tone_marks]
+
+                # choose a smaller zh font and iteratively reduce size until
+                # stacked main symbols fit within the CJK glyph height.
+                n_main = max(
+                    1, (len(main_syms) if main_syms else len(lines)) or 1
+                )
+                zh_font_size = max(10, int(ch_h / n_main))
+                zh_w = 0
+                total_main_h = 0
+                try:
+                    while True:
+                        try:
+                            zh_font = (
+                                ImageFont.truetype(font_path, zh_font_size)
+                                if font_path
+                                else ImageFont.load_default()
+                            )
+                        except Exception:
+                            zh_font = ImageFont.load_default()
+
+                        zh_w = 0
+                        total_main_h = 0
+                        for sym in main_syms if main_syms else lines:
+                            sw, sh = _measure_text_with_pil(sym, zh_font)
+                            zh_w = max(zh_w, sw)
+                            total_main_h += sh + 2
+
+                        if tone_syms:
+                            tw, th = _measure_text_with_pil(
+                                tone_syms[0], zh_font
+                            )
+
+                        if total_main_h <= ch_h or zh_font_size <= 10:
+                            break
+                        zh_font_size -= 1
+                except Exception:
+                    zh_w = zh_w or 0
+                    total_main_h = total_main_h or 0
+
+                # x position for bopomofo (immediately to the right)
+                zh_x = cursor_x + ch_w + 2
+                # force column height to CJK glyph height so overlay box won't
+                # exceed the red bbox
+                col_h = ch_h
+
+                # draw main symbols stacked vertically
+                # compute vertical start (center within col_h)
+                main_start_y = cursor_y + max(0, (col_h - total_main_h) // 2)
+                cur_y = main_start_y
+                for sym in main_syms if main_syms else lines:
+                    draw.text((zh_x, cur_y), sym, font=zh_font, fill=(0, 0, 0))
+                    sw, sh = _measure_text_with_pil(sym, zh_font)
+                    cur_y += sh + 2
+
+                # draw tone marks (if any) centered on the main stacked
+                # bopomofo block's vertical midpoint and moved closer to it.
+                if tone_syms:
+                    # compute total tone height and max width
+                    tone_total_h = 0
+                    tone_max_w = 0
+                    for ts in tone_syms:
+                        tw, th = _measure_text_with_pil(ts, zh_font)
+                        tone_total_h += th + 2
+                        tone_max_w = max(tone_max_w, tw)
+                    # remove last added spacing
+                    if tone_total_h > 0:
+                        tone_total_h -= 2
+
+                    # align tone block height to main stacked bopomofo height
+                    tone_total_h = int(total_main_h)
+                    # place tone box top Y at zh_top + (zh_height/2)
+                    tone_start_y = int(main_start_y + (total_main_h // 2))
+                    # place tone touching bopomofo, then shift left 2px
+                    # (small visual nudge to sit closer to bopomofo)
+                    tone_x = zh_x + int(zh_w) - 2
+                    # draw tones
+                    tcur = tone_start_y
+                    for ts in tone_syms:
+                        draw.text(
+                            (tone_x, tcur), ts, font=zh_font, fill=(0, 0, 0)
+                        )
+                        tw, th = _measure_text_with_pil(ts, zh_font)
+                        tcur += th + 2
+                    # record tone box for overlay
+                    # Use half of the measured max width for the tone box.
+                    # Some bopomofo glyphs render with extra side-bearing.
+                    # Using half the measured width yields a tighter box
+                    # closer to the visual glyph extent while still
+                    # guarding against 0.
+                    half_tone_w = max(1, int(tone_max_w / 2))
+                    tone_box = (
+                        tone_x,
+                        tone_start_y,
+                        tone_x + half_tone_w,
+                        tone_start_y + int(tone_total_h),
+                    )
+
+                # record overlay boxes for debugging
+                overlay_boxes.append(
+                    {
+                        "ch": (
+                            cursor_x,
+                            cursor_y,
+                            cursor_x + ch_w,
+                            cursor_y + ch_h,
+                        ),
+                        # bopomofo box (red)
+                        "zh": (
+                            zh_x,
+                            main_start_y,
+                            zh_x + max(1, int(zh_w)),
+                            main_start_y + int(total_main_h),
+                        ),
+                        # tone box (green) - may be absent if no tone
+                        "tone": tone_box if tone_syms else None,
+                        "col_h": col_h,
+                    }
+                )
+
+                cursor_x += col_w
+
+            # optional debug overlay: save an annotated image when requested
+                try:
+                    dbg_overlay = os.environ.get("SPELLVID_DEBUG_OVERLAY")
+                    dbg_skip = os.environ.get("SPELLVID_DEBUG_SKIP_WRITE")
+                    if dbg_overlay or dbg_skip:
+                        import time as _time
+
+                        overlay_img = img.copy()
+                        od = ImageDraw.Draw(overlay_img)
+                        for i, b in enumerate(overlay_boxes):
+                            # draw CJK char bbox in gray (neutral)
+                            try:
+                                od.rectangle(
+                                    b["ch"], outline=(128, 128, 128), width=1
+                                )
+                            except Exception:
+                                pass
+                            # draw bopomofo (zh) in RED
+                            try:
+                                od.rectangle(
+                                    b["zh"], outline=(255, 0, 0), width=2
+                                )
+                            except Exception:
+                                pass
+                            # draw tone in GREEN if present
+                            try:
+                                if b.get("tone"):
+                                    od.rectangle(
+                                        b["tone"],
+                                        outline=(0, 255, 0),
+                                        width=2,
+                                    )
+                            except Exception:
+                                pass
+                            # write index label near top-left of CJK char box
+                            try:
+                                od.text(
+                                    (b["ch"][0], b["ch"][1] - 12),
+                                    str(i + 1),
+                                    fill=(0, 0, 0),
+                                )
+                            except Exception:
+                                pass
+
+                        snapshot_dir = os.path.join(
+                            os.path.dirname(__file__), "..", "scripts"
+                        )
+                        snapshot_dir = os.path.abspath(snapshot_dir)
+                        os.makedirs(snapshot_dir, exist_ok=True)
+                        overlay_path = os.path.join(
+                            snapshot_dir, f"zh_overlay-{int(_time.time())}.png"
+                        )
+                        overlay_img.save(overlay_path)
+                        print("Wrote zh overlay debug image:", overlay_path)
+                except Exception:
+                    pass
+
             arr = _np.array(img)
             txt_zh_clip = _mpy.ImageClip(arr).with_duration(duration)
             pos_x = 1920 - 64 - txt_zh_clip.w
@@ -829,11 +1118,19 @@ def render_video_moviepy(
         tclip = tclip.with_position((64, 450)).with_start(i)
         clips.append(tclip)
 
-    # Reveal typewriter: show substrings sequentially
+    # Reveal typewriter: show substrings sequentially. Each letter appears
+    # at a fixed interval (`per` seconds). Each substring clip is started
+    # at the appropriate time and kept visible until the end of the video
+    # so the word grows cumulatively. The `reveal_hold_sec` only controls
+    # how long the finished reveal remains on screen after the last letter.
     word_en = item.get("word_en", "")
     if word_en:
         n = max(1, len(word_en))
-        per = reveal / n
+        # per defined earlier as fixed 1.0s; ensure it's present in scope
+        try:
+            per
+        except NameError:
+            per = 1.0
         safe_bottom_margin = 32
         # Compute the full reveal image size once so every substring
         # clip can be rendered on that fixed canvas. This avoids changing
@@ -861,10 +1158,14 @@ def render_video_moviepy(
 
         for idx in range(1, n + 1):
             sub = word_en[:idx]
+            # start time for this substring
+            start = countdown + (idx - 1) * per
+            # keep substring visible until end of video
+            remaining = max(0.0, duration - start)
             # reserve extra bottom space inside reveal image so underlines
             # can be drawn below glyphs without overlapping.
             rc = _make_text_imageclip(
-                text=sub, font_size=128, color=(0, 0, 0), duration=per,
+                text=sub, font_size=128, color=(0, 0, 0), duration=remaining,
                 extra_bottom=32, fixed_size=fixed_canvas,
             )
             # compute a y position so the reveal clip sits above the bottom
@@ -877,9 +1178,7 @@ def render_video_moviepy(
             except Exception:
                 clip_h = 128 + max(8, 128 // 6) * 2
             pos_y = max(0, 1080 - clip_h - safe_bottom_margin)
-            rc = rc.with_position(("center", pos_y)).with_start(
-                countdown + (idx - 1) * per
-            )
+            rc = rc.with_position(("center", pos_y)).with_start(start)
             clips.append(rc)
 
         # If reveal_underlines metadata exists (from compute_layout_bboxes),
@@ -999,7 +1298,13 @@ def render_video_moviepy(
             # keep going — renderer can still produce video without music
             pass
 
-    # beep: generate short sine beeps at last 3 seconds, once per second
+    # beep: generate short sine beeps at the times when the on-screen
+    # countdown displays 03, 02, 01. Previously these were placed in the
+    # last N seconds of the video which caused them to play at the end of
+    # the file regardless of the configured countdown. Compute the
+    # absolute start times by mapping the remaining seconds to the
+    # timeline: when the timer shows S (e.g. 3) that display appears at
+    # time (countdown - S).
     def make_beep(start_sec):
         freq = 1000.0
         length = 0.3
@@ -1018,13 +1323,17 @@ def render_video_moviepy(
         ac = _mpy.AudioClip(make_frame, duration=length, fps=44100)
         return ac.with_start(start_sec)
 
-    last3 = min(3, int(duration))
-    for k in range(last3):
-        start = max(0, duration - last3 + k)
-        try:
-            audio_clips.append(make_beep(start))
-        except Exception:
-            pass
+    # determine which countdown numbers to beep for (3,2,1) but only
+    # include those that are <= configured countdown. For each target S
+    # the on-screen display for S appears at time (countdown - S).
+    beep_targets = [3, 2, 1]
+    for S in beep_targets:
+        if S <= countdown:
+            start = float(max(0.0, countdown - S))
+            try:
+                audio_clips.append(make_beep(start))
+            except Exception:
+                pass
 
     if audio_clips:
         try:
@@ -1035,6 +1344,35 @@ def render_video_moviepy(
 
     # ensure out dir
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    # debug mode: optionally skip full mp4 write to avoid ffmpeg overwriting
+    if os.environ.get('SPELLVID_DEBUG_SKIP_WRITE'):
+        try:
+            import time as _time
+            # write a final frame snapshot instead of full mp4
+            snapshot_dir = os.path.join(
+                os.path.dirname(__file__), '..', 'scripts'
+            )
+            snapshot_dir = os.path.abspath(snapshot_dir)
+            os.makedirs(snapshot_dir, exist_ok=True)
+            snapshot_path = os.path.join(
+                snapshot_dir, f'final_snapshot-{int(_time.time())}.png'
+            )
+            try:
+                final.save_frame(snapshot_path, t=0)
+                print(f'Wrote final composite snapshot: {snapshot_path}')
+            except Exception as _e:
+                print('Failed to write final snapshot:', _e)
+        finally:
+            try:
+                final.close()
+            except Exception:
+                pass
+        return {
+            "status": "debug-snapshot",
+            "snapshot": snapshot_path,
+            "out": out_path,
+        }
+
     # write the file
     try:
         # if ffmpeg is available via IMAGEIO_FFMPEG_EXE,

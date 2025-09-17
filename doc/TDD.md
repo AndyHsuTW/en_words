@@ -45,10 +45,10 @@
 
 ## 5. 測試資料
 
-- `data/words.json`：至少 3 筆（完整 / 缺圖 / 音樂短於影片）。
-- 圖片：`assets/ice.png`、`assets/empty.png`（全白 1920×1080）。
-- 音樂：`assets/ice.mp3`（足長）、`assets/short.mp3`（短於影片）。
-- 嗶聲：`assets/beep.wav`（1kHz, 300ms）。
+- `data/words.json`：至少 3 筆（完整 / 缺資產（image/video 缺失） / 音樂短於影片）。
+- 視覺資產（圖片或影片）：`assets/ice.png`、`assets/empty.png`（全白 1920×1080）、`assets/sample.mp4`（短片範例）。
+- 音樂：`tests/assets/ball.mp3`。
+- 嗶聲：動態生成（1kHz 正弦波, 300ms, 0.2 音量, 44100Hz 採樣率, 立體聲）。
 
 ---
 
@@ -65,7 +65,7 @@
 | TCS-AUDIO-001    | Unit        | FR-AUDIO  | `short.mp3`                    | 不循環；尾段靜音；峰值≤-1 dBTP          |
 | TCS-BEEP-001     | Unit        | FR-TIMER  | 最後 3 秒                         | 三段嗶聲可檢出；可關閉                  |
 | TCS-PIPE-001     | Integration | FR-LAYOUT | 合成一支 12s                       | 中間幀序正確；無例外                   |
-| TCS-FALLBACK-001 | Integration | FR-INPUT  | 缺 `image_path`                 | 以白底圖合成；畫面取樣接近 #FFFFFF        |
+| TCS-FALLBACK-001 | Integration | FR-INPUT  | 缺 `image_path` 或視覺資產不是存在的圖片/影片 | 以白底圖合成；畫面取樣接近 #FFFFFF        |
 | TCS-EXPORT-001   | Integration | FR-EXPORT | ffprobe 檢查                     | h264 / yuv420p / 30fps / aac |
 | TCS-EXPORT-002   | Integration | FR-EXPORT | word\_en=Ice                   | 檔名 `Ice.mp4` 於 `out/`        |
 | TCS-EXPORT-003   | Integration | FR-EXPORT | 片尾                             | 最末 1s 亮度趨降（淡出）               |
@@ -92,7 +92,7 @@ Feature: 批次輸出英語學習短片
   Scenario: 成功批次輸出（含缺圖回退）
     When I run "spellvid batch --json data/words.json --outdir out --beep true"
     Then for each valid item an MP4 named "{word_en}.mp4" is generated under out/
-     And items with missing image use a white background fallback
+  And items with missing image or video use a white background fallback
      And the process prints a summary with counts of succeeded and skipped items
 
   Scenario: Dry-run 檢查資產
