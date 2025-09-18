@@ -266,7 +266,12 @@ SCHEMA = {
             "music_path": {"type": "string"},
             "countdown_sec": {"type": "integer"},
             "reveal_hold_sec": {"type": "integer"},
-            "theme": {"type": "string"}
+            "theme": {"type": "string"},
+            "video_mode": {
+                "type": "string",
+                "enum": ["fit", "cover"],
+                "default": "fit"
+            }
         },
         "additionalProperties": False
     }
@@ -908,11 +913,9 @@ def render_video_moviepy(
                 bg_used = True
                 bg_placement = (pos_x, pos_y, new_w, new_h)
             elif img_path.lower().endswith(vid_exts):
-                # Video path: load VideoFileClip, resize to cover the
-                # fixed central square box (same size as image path handling),
-                # then center-crop to exactly that box so there are no
-                # black bars; finally ensure the resulting clip loops to
-                # match the composition duration.
+                # Video path: load VideoFileClip and apply scaling based on
+                # video_mode. 'fit' scales to fit within bounds (no cropping),
+                # 'cover' scales to fill bounds (with center cropping).
                 try:
                     VideoFileClip = None
                     try:
@@ -935,23 +938,17 @@ def render_video_moviepy(
                         # target centered square size (70% of shorter dim)
                         box_side = int(min(1920, 1080) * 0.7)
 
-                        # compute scale to FIT inside the target square (same
-                        # behavior as image handling). This ensures the video
-                        # central area uses the same width/height as images
-                        # and avoids overlapping the reveal area at bottom.
-                        vw, vh = vclip.size
-                        # avoid division by zero
-                        vw = max(1, vw)
-                        vh = max(1, vh)
-                        scale = min(box_side / vw, box_side / vh)
-                        new_w = max(1, int(vw * scale))
-                        new_h = max(1, int(vh * scale))
+                        # Get video_mode from config, default to 'fit'
+                        video_mode = item.get("video_mode", "fit")
 
-                        # Before resizing, ensure the target size won't force
+                        # Get original video dimensions
+                        vw, vh = vclip.size
+                        vw = max(1, vw)  # avoid division by zero
+                        vh = max(1, vh)
+
+                        # Before scaling, ensure the target box won't force
                         # the centered video to overlap the reveal area.
-                        # If it would, reduce the requested height (and width
-                        # proportionally) so centered placement stays above the
-                        # reveal. This is more robust than only shifting pos.
+                        target_box_side = box_side
                         try:
                             if (
                                 reveal_placement is not None
@@ -971,128 +968,88 @@ def render_video_moviepy(
                                 # 2 * (reveal_top - margin) to avoid overlap
                                 max_allowed_h = max(
                                     1, 2 * (reveal_top - margin))
-                                if new_h > max_allowed_h:
-                                    scale2 = max_allowed_h / float(new_h)
-                                    new_h = max(1, int(new_h * scale2))
-                                    new_w = max(1, int(new_w * scale2))
+                                target_box_side = min(
+                                    target_box_side, max_allowed_h)
                         except Exception:
                             pass
 
-                        # Resize using whichever API is available.
-                        try:
-                            v_resized = vclip.resized((new_w, new_h))
-                        except Exception:
+                        if video_mode == "cover":
+                            # Cover mode: scale to fill the target box,
+                            # then crop to exact box dimensions
+                            scale = max(target_box_side / vw,
+                                        target_box_side / vh)
+                            scaled_w = max(1, int(vw * scale))
+                            scaled_h = max(1, int(vh * scale))
+
+                            # Resize video to scaled dimensions
+                            v_resized = None
                             try:
-                                v_resized = _mpy.vfx.resize(
-                                    vclip, newsize=(new_w, new_h)
-                                )
+                                v_resized = vclip.resized((scaled_w, scaled_h))
                             except Exception:
                                 try:
-                                    v_resized = vclip.fx(
-                                        _mpy.vfx.resize, newsize=(new_w, new_h)
+                                    v_resized = _mpy.vfx.resize(
+                                        vclip, newsize=(scaled_w, scaled_h)
                                     )
-                                except Exception:
-                                    v_resized = vclip
-
-                        # CRITICAL: Verify the resized clip doesn't exceed our
-                        # target dimensions. If resize failed, force fit.
-                        actual_w = (
-                            getattr(v_resized, 'w', None) or
-                            getattr(v_resized, 'size', (None, None))[0]
-                        )
-                        actual_h = (
-                            getattr(v_resized, 'h', None) or
-                            getattr(v_resized, 'size', (None, None))[1]
-                        )
-
-                        if actual_w and actual_h:
-                            actual_w, actual_h = int(actual_w), int(actual_h)
-                            # If dimensions still exceed box_side, force resize
-                            if actual_w > box_side or actual_h > box_side:
-                                # Recalculate scale for strict compliance
-                                # Use contain/fit scaling - always scale to fit within bounds
-                                strict_scale = min(
-                                    box_side / actual_w, box_side / actual_h
-                                )
-                                final_w = max(1, int(actual_w * strict_scale))
-                                final_h = max(1, int(actual_h * strict_scale))
-
-                                # Try multiple resize methods, avoid cropping
-                                resize_success = False
-                                try:
-                                    v_resized = v_resized.resized(
-                                        (final_w, final_h)
-                                    )
-                                    resize_success = True
                                 except Exception:
                                     try:
-                                        v_resized = _mpy.vfx.resize(
-                                            v_resized,
-                                            newsize=(final_w, final_h)
+                                        v_resized = vclip.fx(
+                                            _mpy.vfx.resize,
+                                            newsize=(scaled_w, scaled_h)
                                         )
-                                        resize_success = True
                                     except Exception:
-                                        try:
-                                            v_resized = v_resized.fx(
-                                                _mpy.vfx.resize,
-                                                newsize=(final_w, final_h)
-                                            )
-                                            resize_success = True
-                                        except Exception:
-                                            # No cropping - just keep the video as-is
-                                            # CompositeVideoClip will handle final constraint
-                                            pass
+                                        v_resized = vclip
+                                        scaled_w, scaled_h = vw, vh
 
-                                # Update dimensions for positioning
-                                if resize_success:
-                                    new_w, new_h = final_w, final_h
-                                else:
-                                    # Keep original dimensions, let CompositeVideoClip constrain
-                                    new_w, new_h = actual_w, actual_h
+                            # Center crop to target box size
+                            crop_x = max(0, (scaled_w - target_box_side) // 2)
+                            crop_y = max(0, (scaled_h - target_box_side) // 2)
 
-                        # CRITICAL: Ensure proper contain/fit scaling
-                        # Calculate the target size to fit within box_side bounds
-                        if new_w > box_side or new_h > box_side:
-                            # Apply contain/fit scaling to stay within box_side
-                            scale_factor = min(
-                                box_side / new_w, box_side / new_h)
-                            final_w = max(1, int(new_w * scale_factor))
-                            final_h = max(1, int(new_h * scale_factor))
-                        else:
-                            # Video already fits within bounds
-                            final_w = new_w
-                            final_h = new_h
-
-                        # ALWAYS resize the video to exact final dimensions
-                        # This ensures true contain/fit behavior
-                        resize_success = False
-                        try:
-                            v_cropped = v_resized.resized((final_w, final_h))
-                            resize_success = True
-                        except Exception:
                             try:
-                                v_cropped = _mpy.vfx.resize(
-                                    v_resized, newsize=(final_w, final_h))
-                                resize_success = True
+                                v_cropped = v_resized.cropped(
+                                    x1=crop_x, y1=crop_y,
+                                    x2=crop_x + target_box_side,
+                                    y2=crop_y + target_box_side
+                                )
+                                new_w = new_h = target_box_side
+                            except Exception:
+                                # If cropping fails, use the resized video
+                                v_cropped = v_resized
+                                new_w, new_h = scaled_w, scaled_h
+
+                        else:  # fit mode (default)
+                            # Fit mode: scale to fit within target box bounds
+                            scale = min(target_box_side / vw,
+                                        target_box_side / vh)
+                            new_w = max(1, int(vw * scale))
+                            new_h = max(1, int(vh * scale))
+
+                            # Resize using whichever API is available
+                            try:
+                                v_cropped = vclip.resized((new_w, new_h))
                             except Exception:
                                 try:
-                                    v_cropped = v_resized.fx(
-                                        _mpy.vfx.resize, newsize=(final_w, final_h))
-                                    resize_success = True
+                                    v_cropped = _mpy.vfx.resize(
+                                        vclip, newsize=(new_w, new_h)
+                                    )
                                 except Exception:
-                                    # If all resize methods fail, keep original
-                                    v_cropped = v_resized
-                                    final_w = new_w
-                                    final_h = new_h
+                                    try:
+                                        v_cropped = vclip.fx(
+                                            _mpy.vfx.resize,
+                                            newsize=(new_w, new_h)
+                                        )
+                                    except Exception:
+                                        v_cropped = vclip
+                                        new_w, new_h = vw, vh
 
-                        # Update dimensions for positioning
-                        new_w, new_h = final_w, final_h
-
-                        # Now ensure the clip spans the full composition
-                        # duration by looping it if needed. Try vfx.loop, fx
-                        # wrapper, or a concatenate-based fallback.
+                        # Ensure the clip spans the full composition duration
+                        # by looping it if needed
+                        video_duration = getattr(v_cropped, "duration", 0)
                         try:
-                            if getattr(v_cropped, "duration", 0) < duration:
+                            if video_duration < duration:
+                                # Try approaches to create looped video
+                                v_looped = None
+
+                                # First, try the modern moviepy loop approach
                                 try:
                                     v_looped = _mpy.vfx.loop(
                                         v_cropped, duration=duration
@@ -1103,47 +1060,101 @@ def render_video_moviepy(
                                             _mpy.vfx.loop, duration=duration
                                         )
                                     except Exception:
-                                        # concatenate fallback
-                                        try:
-                                            import math as _math
+                                        v_looped = None
 
-                                            n = int(
-                                                _math.ceil(
-                                                    duration
-                                                    / max(
-                                                        0.001,
-                                                        getattr(
-                                                            v_cropped,
-                                                            "duration",
-                                                            0.001,
-                                                        ),
-                                                    ),
+                                # If loop failed, try concatenate approach
+                                if v_looped is None:
+                                    try:
+                                        import math as _math
+
+                                        # Calculate how many copies we need
+                                        n = max(1, int(
+                                            _math.ceil(
+                                                duration / max(
+                                                    0.001, video_duration
                                                 )
                                             )
-                                            clips_to_concat = [v_cropped] * n
+                                        ))
+                                        clips_to_concat = [v_cropped] * n
+
+                                        # Try different concatenate approaches
+                                        try:
+                                            v_concat = (
+                                                _mpy.concatenate_videoclips(
+                                                    clips_to_concat,
+                                                    method="compose"
+                                                )
+                                            )
+                                            v_looped = v_concat.with_duration(
+                                                duration
+                                            )
+                                        except Exception:
                                             try:
+                                                # Alt concatenate method
                                                 _concat_fn = getattr(
                                                     _mpy,
-                                                    "concatenate_videoclips",
+                                                    "concatenate_videoclips"
                                                 )
                                                 v_concat = _concat_fn(
-                                                    clips_to_concat,
-                                                    method=("compose",),
+                                                    clips_to_concat
                                                 )
-                                                v_looped = v_concat.subclip(
-                                                    0,
-                                                    duration,
-                                                )
-                                            except Exception:
-                                                # last resort: set duration
                                                 v_looped = (
-                                                    v_cropped.with_duration(
+                                                    v_concat.with_duration(
                                                         duration
                                                     )
                                                 )
-                                        except Exception:
-                                            v_looped = v_cropped.with_duration(
-                                                duration)
+                                            except Exception:
+                                                # Manual loop using subclip
+                                                loop_clips = []
+                                                current_time = 0
+                                                while current_time < duration:
+                                                    remaining = (
+                                                        duration - current_time
+                                                    )
+                                                    if (
+                                                        remaining >=
+                                                        video_duration
+                                                    ):
+                                                        loop_clips.append(
+                                                            v_cropped
+                                                        )
+                                                        current_time += (
+                                                            video_duration
+                                                        )
+                                                    else:
+                                                        # Partial clip for end
+                                                        loop_clips.append(
+                                                            v_cropped.subclip(
+                                                                0, remaining
+                                                            )
+                                                        )
+                                                        current_time = duration
+                                                try:
+                                                    v_looped = (
+                                                        _mpy.concatenate_videoclips(  # noqa: E501
+                                                            loop_clips,
+                                                            method="compose"
+                                                        )
+                                                    )
+                                                except Exception:
+                                                    # Ultimate fallback
+                                                    v_looped = (
+                                                        v_cropped
+                                                        .with_duration(
+                                                            duration
+                                                        )
+                                                    )
+                                    except Exception:
+                                        # Ultimate fallback: extend duration
+                                        v_looped = v_cropped.with_duration(
+                                            duration
+                                        )
+
+                                # Ensure we have a valid looped clip
+                                if v_looped is None:
+                                    v_looped = v_cropped.with_duration(
+                                        duration
+                                    )
                             else:
                                 # if clip >= duration, trim to exact duration
                                 try:
@@ -1172,8 +1183,11 @@ def render_video_moviepy(
                             except Exception:
                                 v_looped = v_cropped
 
+                        # Position the video in the center
                         pos_x = (1920 - new_w) // 2
                         pos_y = (1080 - new_h) // 2
+
+                        # Adjust position if needed to avoid reveal area
                         try:
                             if (
                                 reveal_placement is not None
@@ -1194,6 +1208,7 @@ def render_video_moviepy(
                                 pos_y = max(0, reveal_top - new_h - 8)
                         except Exception:
                             pass
+
                         v_final = v_looped.with_position((pos_x, pos_y))
                         clips.append(v_final)
                         bg_used = True
