@@ -778,6 +778,41 @@ def render_video_moviepy(
     if dry_run:
         return {"status": "dry-run", "out": out_path}
 
+    # compute reveal clip size early so we can avoid placing the background
+    # such that it overlaps the reveal area. This uses the same _make_text
+    # path the renderer uses later so runtime sizes match what gets placed.
+    reveal_placement = None
+    try:
+        word_en = item.get("word_en", "")
+        if word_en:
+            # create a sample full reveal clip to measure the runtime size
+            full_rc = _make_text_imageclip(
+                text=word_en, font_size=128, color=(0, 0, 0),
+                extra_bottom=32, duration=1,
+            )
+            full_w = (
+                getattr(full_rc, "w", None)
+                or getattr(full_rc, "size", (None, None))[0]
+            )
+            full_h = (
+                getattr(full_rc, "h", None)
+                or getattr(full_rc, "size", (None, None))[1]
+            )
+            full_w = int(full_w) if full_w is not None else None
+            full_h = int(full_h) if full_h is not None else None
+            # compute the y position used later in the renderer
+            safe_bottom_margin = 32
+            if full_h is not None:
+                reveal_pos_y = max(0, 1080 - full_h - safe_bottom_margin)
+                reveal_pos_x = None
+                if full_w is not None:
+                    reveal_pos_x = max(0, (1920 - full_w) // 2)
+                reveal_placement = (
+                    reveal_pos_x, reveal_pos_y, full_w, full_h
+                )
+    except Exception:
+        reveal_placement = None
+
     # prepare background: always use a white full-screen ColorClip
     bg = (
         _mpy.ColorClip(size=(1920, 1080), color=(255, 255, 255))
@@ -790,10 +825,14 @@ def render_video_moviepy(
     img_path = item.get("image_path")
     bg_used = False
     bg_error = None
+    bg_placement = None
     if img_path and os.path.isfile(img_path):
+        # support both static images and video files as central background
         img_exts = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff")
-        if img_path.lower().endswith(img_exts):
-            try:
+        vid_exts = (".mp4", ".mov", ".mkv", ".avi", ".webm")
+        try:
+            if img_path.lower().endswith(img_exts):
+                # Image path: render single ImageClip stretched to a centered
                 from PIL import Image as _PILImage
 
                 pil_img = _PILImage.open(img_path).convert("RGBA")
@@ -805,20 +844,370 @@ def render_video_moviepy(
                 new_h = max(1, int(h0 * scale))
                 pil_img = pil_img.resize((new_w, new_h), _PILImage.LANCZOS)
                 arr = _np.array(pil_img)
-
+                # Ensure the centered image won't overlap the reveal area.
+                # Cap its height if necessary so centered placement stays
+                # above the reveal top.
+                try:
+                    # determine reveal_top using runtime measurement or
+                    # fallback to compute_layout_bboxes
+                    rbox = None
+                    if (
+                        reveal_placement is not None
+                        and reveal_placement[1] is not None
+                    ):
+                        reveal_top = int(reveal_placement[1])
+                    else:
+                        rbox = compute_layout_bboxes(item).get(
+                            "reveal"
+                        )
+                        reveal_top = None
+                        if rbox is not None:
+                            reveal_top = int(rbox.get("y", 0))
+                    if reveal_top is not None:
+                        margin = 16
+                        # allowed_h ensures (center_y - new_h/2) + new_h
+                        # <= reveal_top - margin; solve for allowed_h
+                        allowed_h = int(
+                            max(1, 2 * reveal_top - 2 * margin - 1080)
+                        )
+                        if new_h > allowed_h:
+                            scale2 = allowed_h / float(new_h)
+                            new_h = max(1, int(new_h * scale2))
+                            new_w = max(1, int(new_w * scale2))
+                            pil_img = pil_img.resize(
+                                (new_w, new_h), _PILImage.LANCZOS
+                            )
+                            arr = _np.array(pil_img)
+                except Exception:
+                    pass
                 img_clip = _mpy.ImageClip(arr).with_duration(duration)
                 # position centered
                 pos_x = (1920 - new_w) // 2
                 pos_y = (1080 - new_h) // 2
+                # avoid overlapping the reveal area using runtime reveal
+                # placement if available (preferred), otherwise fall back
+                # to compute_layout_bboxes estimate.
+                try:
+                    if (
+                        reveal_placement is not None
+                        and reveal_placement[1] is not None
+                    ):
+                        reveal_top = int(reveal_placement[1])
+                    else:
+                        rbox = compute_layout_bboxes(item).get("reveal")
+                        reveal_top = (
+                            int(rbox.get("y", 0)) if rbox is not None else None
+                        )
+                    if reveal_top is not None and pos_y + new_h > reveal_top:
+                        pos_y = max(0, reveal_top - new_h - 8)
+                except Exception:
+                    pass
+
                 img_clip = img_clip.with_position((pos_x, pos_y))
                 clips.append(img_clip)
                 bg_used = True
-            except Exception as e:
-                bg_error = str(e)
-                # leave only white background
-        else:
-            # not an image extension; ignore and keep white bg
-            pass
+                bg_placement = (pos_x, pos_y, new_w, new_h)
+            elif img_path.lower().endswith(vid_exts):
+                # Video path: load VideoFileClip, resize to cover the
+                # fixed central square box (same size as image path handling),
+                # then center-crop to exactly that box so there are no
+                # black bars; finally ensure the resulting clip loops to
+                # match the composition duration.
+                try:
+                    VideoFileClip = None
+                    try:
+                        # import VideoFileClip from moviepy.editor if available
+                        from moviepy.editor import (
+                            VideoFileClip as _V,
+                        )
+                        VideoFileClip = _V
+                    except Exception:
+                        # fallback to top-level
+                        try:
+                            import moviepy as _m
+
+                            VideoFileClip = getattr(_m, "VideoFileClip", None)
+                        except Exception:
+                            VideoFileClip = None
+
+                    if VideoFileClip is not None:
+                        vclip = VideoFileClip(img_path)
+                        # target centered square size (70% of shorter dim)
+                        box_side = int(min(1920, 1080) * 0.7)
+
+                        # compute scale to FIT inside the target square (same
+                        # behavior as image handling). This ensures the video
+                        # central area uses the same width/height as images
+                        # and avoids overlapping the reveal area at bottom.
+                        vw, vh = vclip.size
+                        # avoid division by zero
+                        vw = max(1, vw)
+                        vh = max(1, vh)
+                        scale = min(box_side / vw, box_side / vh)
+                        new_w = max(1, int(vw * scale))
+                        new_h = max(1, int(vh * scale))
+
+                        # Before resizing, ensure the target size won't force
+                        # the centered video to overlap the reveal area.
+                        # If it would, reduce the requested height (and width
+                        # proportionally) so centered placement stays above the
+                        # reveal. This is more robust than only shifting pos.
+                        try:
+                            if (
+                                reveal_placement is not None
+                                and reveal_placement[1] is not None
+                            ):
+                                reveal_top = int(reveal_placement[1])
+                            else:
+                                rbox = compute_layout_bboxes(item).get(
+                                    "reveal"
+                                )
+                                reveal_top = None
+                                if rbox is not None:
+                                    reveal_top = int(rbox.get("y", 0))
+                            if reveal_top is not None:
+                                margin = 16
+                                # For centered video: height should be at most
+                                # 2 * (reveal_top - margin) to avoid overlap
+                                max_allowed_h = max(
+                                    1, 2 * (reveal_top - margin))
+                                if new_h > max_allowed_h:
+                                    scale2 = max_allowed_h / float(new_h)
+                                    new_h = max(1, int(new_h * scale2))
+                                    new_w = max(1, int(new_w * scale2))
+                        except Exception:
+                            pass
+
+                        # Resize using whichever API is available.
+                        try:
+                            v_resized = vclip.resized((new_w, new_h))
+                        except Exception:
+                            try:
+                                v_resized = _mpy.vfx.resize(
+                                    vclip, newsize=(new_w, new_h)
+                                )
+                            except Exception:
+                                try:
+                                    v_resized = vclip.fx(
+                                        _mpy.vfx.resize, newsize=(new_w, new_h)
+                                    )
+                                except Exception:
+                                    v_resized = vclip
+
+                        # CRITICAL: Verify the resized clip doesn't exceed our
+                        # target dimensions. If resize failed, force fit.
+                        actual_w = (
+                            getattr(v_resized, 'w', None) or
+                            getattr(v_resized, 'size', (None, None))[0]
+                        )
+                        actual_h = (
+                            getattr(v_resized, 'h', None) or
+                            getattr(v_resized, 'size', (None, None))[1]
+                        )
+
+                        if actual_w and actual_h:
+                            actual_w, actual_h = int(actual_w), int(actual_h)
+                            # If dimensions still exceed box_side, force resize
+                            if actual_w > box_side or actual_h > box_side:
+                                # Recalculate scale for strict compliance
+                                # Use contain/fit scaling - always scale to fit within bounds
+                                strict_scale = min(
+                                    box_side / actual_w, box_side / actual_h
+                                )
+                                final_w = max(1, int(actual_w * strict_scale))
+                                final_h = max(1, int(actual_h * strict_scale))
+
+                                # Try multiple resize methods, avoid cropping
+                                resize_success = False
+                                try:
+                                    v_resized = v_resized.resized(
+                                        (final_w, final_h)
+                                    )
+                                    resize_success = True
+                                except Exception:
+                                    try:
+                                        v_resized = _mpy.vfx.resize(
+                                            v_resized,
+                                            newsize=(final_w, final_h)
+                                        )
+                                        resize_success = True
+                                    except Exception:
+                                        try:
+                                            v_resized = v_resized.fx(
+                                                _mpy.vfx.resize,
+                                                newsize=(final_w, final_h)
+                                            )
+                                            resize_success = True
+                                        except Exception:
+                                            # No cropping - just keep the video as-is
+                                            # CompositeVideoClip will handle final constraint
+                                            pass
+
+                                # Update dimensions for positioning
+                                if resize_success:
+                                    new_w, new_h = final_w, final_h
+                                else:
+                                    # Keep original dimensions, let CompositeVideoClip constrain
+                                    new_w, new_h = actual_w, actual_h
+
+                        # CRITICAL: Ensure proper contain/fit scaling
+                        # Calculate the target size to fit within box_side bounds
+                        if new_w > box_side or new_h > box_side:
+                            # Apply contain/fit scaling to stay within box_side
+                            scale_factor = min(
+                                box_side / new_w, box_side / new_h)
+                            final_w = max(1, int(new_w * scale_factor))
+                            final_h = max(1, int(new_h * scale_factor))
+                        else:
+                            # Video already fits within bounds
+                            final_w = new_w
+                            final_h = new_h
+
+                        # ALWAYS resize the video to exact final dimensions
+                        # This ensures true contain/fit behavior
+                        resize_success = False
+                        try:
+                            v_cropped = v_resized.resized((final_w, final_h))
+                            resize_success = True
+                        except Exception:
+                            try:
+                                v_cropped = _mpy.vfx.resize(
+                                    v_resized, newsize=(final_w, final_h))
+                                resize_success = True
+                            except Exception:
+                                try:
+                                    v_cropped = v_resized.fx(
+                                        _mpy.vfx.resize, newsize=(final_w, final_h))
+                                    resize_success = True
+                                except Exception:
+                                    # If all resize methods fail, keep original
+                                    v_cropped = v_resized
+                                    final_w = new_w
+                                    final_h = new_h
+
+                        # Update dimensions for positioning
+                        new_w, new_h = final_w, final_h
+
+                        # Now ensure the clip spans the full composition
+                        # duration by looping it if needed. Try vfx.loop, fx
+                        # wrapper, or a concatenate-based fallback.
+                        try:
+                            if getattr(v_cropped, "duration", 0) < duration:
+                                try:
+                                    v_looped = _mpy.vfx.loop(
+                                        v_cropped, duration=duration
+                                    )
+                                except Exception:
+                                    try:
+                                        v_looped = v_cropped.fx(
+                                            _mpy.vfx.loop, duration=duration
+                                        )
+                                    except Exception:
+                                        # concatenate fallback
+                                        try:
+                                            import math as _math
+
+                                            n = int(
+                                                _math.ceil(
+                                                    duration
+                                                    / max(
+                                                        0.001,
+                                                        getattr(
+                                                            v_cropped,
+                                                            "duration",
+                                                            0.001,
+                                                        ),
+                                                    ),
+                                                )
+                                            )
+                                            clips_to_concat = [v_cropped] * n
+                                            try:
+                                                _concat_fn = getattr(
+                                                    _mpy,
+                                                    "concatenate_videoclips",
+                                                )
+                                                v_concat = _concat_fn(
+                                                    clips_to_concat,
+                                                    method=("compose",),
+                                                )
+                                                v_looped = v_concat.subclip(
+                                                    0,
+                                                    duration,
+                                                )
+                                            except Exception:
+                                                # last resort: set duration
+                                                v_looped = (
+                                                    v_cropped.with_duration(
+                                                        duration
+                                                    )
+                                                )
+                                        except Exception:
+                                            v_looped = v_cropped.with_duration(
+                                                duration)
+                            else:
+                                # if clip >= duration, trim to exact duration
+                                try:
+                                    v_looped = (
+                                        v_cropped.subclip(0, duration)
+                                        .with_duration(
+                                            duration
+                                        )
+                                    )
+                                except Exception:
+                                    try:
+                                        v_looped = (
+                                            v_cropped.with_duration(
+                                                duration
+                                            )
+                                        )
+                                    except Exception:
+                                        v_looped = v_cropped
+                        except Exception:
+                            try:
+                                v_looped = (
+                                    v_cropped.with_duration(
+                                        duration
+                                    )
+                                )
+                            except Exception:
+                                v_looped = v_cropped
+
+                        pos_x = (1920 - new_w) // 2
+                        pos_y = (1080 - new_h) // 2
+                        try:
+                            if (
+                                reveal_placement is not None
+                                and reveal_placement[1] is not None
+                            ):
+                                reveal_top = int(reveal_placement[1])
+                            else:
+                                rbox = compute_layout_bboxes(item).get(
+                                    "reveal"
+                                )
+                                reveal_top = None
+                                if rbox is not None:
+                                    reveal_top = int(rbox.get("y", 0))
+                            if (
+                                reveal_top is not None
+                                and pos_y + new_h > reveal_top
+                            ):
+                                pos_y = max(0, reveal_top - new_h - 8)
+                        except Exception:
+                            pass
+                        v_final = v_looped.with_position((pos_x, pos_y))
+                        clips.append(v_final)
+                        bg_used = True
+                        bg_placement = (pos_x, pos_y, new_w, new_h)
+                    else:
+                        # VideoFileClip couldn't be imported; treat as missing
+                        bg_error = "moviepy VideoFileClip unavailable"
+                except Exception as e:
+                    bg_error = str(e)
+            else:
+                # unknown extension: ignore and keep white bg
+                pass
+        except Exception as e:
+            bg_error = str(e)
 
     # Letters (top-left) — move lower to avoid clipping
     letters = item.get("letters", "")
@@ -1371,6 +1760,11 @@ def render_video_moviepy(
             "status": "debug-snapshot",
             "snapshot": snapshot_path,
             "out": out_path,
+            "bg_placement": bg_placement,
+            "bg_used": bg_used,
+            "bg_error": bg_error,
+            "audio_loaded": audio_loaded,
+            "audio_error": audio_error,
         }
 
     # write the file
@@ -1404,4 +1798,5 @@ def render_video_moviepy(
         "bg_error": bg_error,
         "audio_loaded": audio_loaded,
         "audio_error": audio_error,
+        "bg_placement": bg_placement,
     }
