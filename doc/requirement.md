@@ -60,49 +60,50 @@
 
 # 功能性需求（Functional Requirements）
 
-> 採「The system shall …」句式，MoSCoW 標記優先度。
+> 採「本系統應…」句式，MoSCoW 標記優先度。
 
 ### 1. 輸入與資料模型
 
 | ID         | 敘述                                                                                                                | 優先度  |
 | ---------- | ----------------------------------------------------------------------------------------------------------------- | ---- |
-| FR-INPUT-1 | The system shall 以 **JSON 陣列** 作為批次輸入，每個元素代表一支影片。                                                                 | Must |
-| FR-INPUT-2 | The system shall 支援欄位：`letters, word_en, word_zh, image_path, music_path, countdown_sec, reveal_hold_sec, theme`。 | Must |
-| FR-INPUT-3 | The system shall 在 `image_path` 缺檔時以 **白色底圖** 取代，並寫入日誌。                                                           | Must |
-| FR-INPUT-4 | The system shall 自動為 `word_zh` 產生 **注音** 並顯示於中文右方（可關閉）。                                                           | Must |
+| FR-INPUT-1 | 本系統應以 **JSON 陣列** 作為批次輸入，每個元素代表一支影片。                                                                 | Must |
+| FR-INPUT-2 | 本系統應支援欄位：`letters, word_en, word_zh, image_path, music_path, countdown_sec, reveal_hold_sec, theme`。 | Must |
+| FR-INPUT-3 | 本系統應在 `image_path` 缺檔時以 **白色底圖** 取代，並寫入日誌。                                                           | Must |
+| FR-INPUT-4 | 本系統應自動為 `word_zh` 產生 **注音** 並顯示於中文右方（可關閉）。                                                           | Must |
 
 ### 2. 版面與合成
 
 | ID          | 敘述                                                                      | 優先度    |
 | ----------- | ----------------------------------------------------------------------- | ------ |
-| FR-LAYOUT-1 | The system shall 以固定解析度 **1920×1080\@30fps** 合成。                        | Must   |
-| FR-LAYOUT-2 | The system shall 於左上顯示 `letters`，右上顯示中文+注音，左側顯示計時器中央為主圖，底部在倒數計時後顯示英文單字。 | Must   |
-| FR-LAYOUT-3 | The system shall 支援進場特效 **fade** 與 **slide**（擇一，全域預設可在 config 指定）。      | Should |
-| FR-LAYOUT-4 | The system shall 揭示答案時使用 **typewriter** 動效。                             | Should |
+| FR-LAYOUT-1 | 本系統應以固定解析度 **1920×1080\@30fps** 合成。                        | Must   |
+| FR-LAYOUT-2 | 本系統應於左上顯示 `letters`，右上顯示中文+注音，左側顯示計時器中央為主圖，底部在倒數計時後顯示英文單字。 | Must   |
+| FR-LAYOUT-3 | 本系統應支援進場特效 **fade** 與 **slide**（擇一，全域預設可在 config 指定）。      | Should |
+| FR-LAYOUT-4 | 本系統應於揭示答案時使用 **typewriter** 動效。                             | Should |
 
 ### 3. 計時與音訊
 
 | ID         | 敘述                                                                | 優先度  |
 | ---------- | ----------------------------------------------------------------- | ---- |
-| FR-TIMER-1 | The system shall 顯示 `MM:SS` 計時器，預設 **10 秒** 倒數；位置在 **左側黑底白字** 區塊。 | Must |
-| FR-TIMER-2 | The system shall 在最後 **3 秒** 播放嗶聲提示（可透過參數停用）。                     | Must |
-| FR-AUDIO-1 | The system shall 支援為每支影片匯入 **一段 MP3**（不循環），與嗶聲做混音，避免削波。           | Must |
+| FR-TIMER-1 | 本系統應顯示 `MM:SS` 計時器，預設 **10 秒** 倒數；位置在 **左側黑底白字** 區塊。 | Must |
+| FR-TIMER-2 | 本系統應在最後 **3 秒** 播放嗶聲提示（可透過參數停用）。                     | Must |
+| FR-TIMER-3 | 本系統應支援隱藏倒數計時的顯示（例如 CLI 旗標 `--hide-timer` 或 `--timer-visible false`），但提示音（嗶聲）行為不受此設定影響，仍依 `--beep` 參數控制。 | Must |
+| FR-AUDIO-1 | 本系統應支援為每支影片匯入 **一段 MP3**（不循環），與嗶聲做混音，避免削波。           | Must |
 
 ### 4. 輸出與檔名
 
 | ID          | 敘述                                                            | 優先度  |
 | ----------- | ------------------------------------------------------------- | ---- |
-| FR-EXPORT-1 | The system shall 以 **H.264（yuv420p, CRF 18–23）+ AAC** 匯出 MP4。 | Must |
-| FR-EXPORT-2 | The system shall 以 `{word_en}.mp4` 命名並輸出至 `./out`（可變更）。       | Must |
-| FR-EXPORT-3 | The system shall 於影片末端加入 **1 秒** 淡出。                          | Must |
+| FR-EXPORT-1 | 本系統應以 **H.264（yuv420p, CRF 18–23）+ AAC** 匯出 MP4。 | Must |
+| FR-EXPORT-2 | 本系統應以 `{word_en}.mp4` 命名並輸出至 `./out`（可變更）。       | Must |
+| FR-EXPORT-3 | 本系統應於影片末端加入 **1 秒** 淡出。                          | Must |
 
 ### 5. CLI 與操作
 
 | ID       | 敘述                                                   | 優先度  |
 | -------- | ---------------------------------------------------- | ---- |
-| FR-CLI-1 | The system shall 提供 `spellvid make` 以參數生成單支影片。       | Must |
-| FR-CLI-2 | The system shall 提供 `spellvid batch` 以 JSON 陣列檔批次生成。 | Must |
-| FR-OPS-1 | The system shall 產出結構化日誌，遇缺檔或錯誤時不中斷整批流程並記錄。          | Must |
+| FR-CLI-1 | 本系統應提供 `spellvid make` 以參數生成單支影片。       | Must |
+| FR-CLI-2 | 本系統應提供 `spellvid batch` 以 JSON 陣列檔批次生成。 | Must |
+| FR-OPS-1 | 本系統應產出結構化日誌，遇缺檔或錯誤時不中斷整批流程並記錄。          | Must |
 
 ---
 
@@ -199,7 +200,7 @@ Scenario: 批次生成（batch）
 
 # 功能性需求（增補草案｜與上方 FR 表對齊）
 
-| ID       | 名稱    | 敘述（The system shall …）                                   | 優先度    |
+| ID       | 名稱    | 敘述（本系統應…）                                   | 優先度    |
 | -------- | ----- | -------------------------------------------------------- | ------ |
 | FR-CLI-1 | 單片生成  | 透過 `spellvid make` 以參數建立單支影片，包含左上字母、右上中文、中央圖像、倒數計時與揭示答案。 | Must   |
 | FR-CLI-2 | 批次生成  | 透過 `spellvid batch` 從 CSV/JSON 讀取多筆設定批次輸出。               | Must   |

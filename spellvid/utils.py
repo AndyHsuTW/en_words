@@ -703,7 +703,7 @@ def compute_layout_bboxes(
         # reserve extra bottom space inside the reveal image so underlines
         # can be drawn beneath the glyphs without overlapping. This must
         # mirror the extra_bottom used when creating reveal ImageClips.
-        reveal_extra_bottom = 32
+        reveal_extra_bottom = 48
         img_w = int(rw + pad_x * 2)
         img_h = int(rh + pad_y * 2 + reveal_extra_bottom)
 
@@ -718,7 +718,7 @@ def compute_layout_bboxes(
         rx = max(0, (w_vid - img_w) // 2)
         # place reveal so it sits above the bottom of the video with a
         # safe margin to avoid glyph descent clipping on some fonts
-        safe_bottom_margin = 32
+        safe_bottom_margin = 48
         ry = max(0, h_vid - img_h - safe_bottom_margin)
         boxes["reveal"] = {
             "x": rx,
@@ -744,11 +744,11 @@ def compute_layout_bboxes(
             underline_h = 4
             # leave a slightly larger margin between glyph baseline and
             # underline so they don't overlap across fonts
-            underline_margin_bottom = 12
+            underline_margin_bottom = 24
             underlines = []
             # left padding used when constructing the image in
             # _make_text_imageclip
-            pad_x = max(12, reveal_font_size // 6)
+            pad_x = max(24, reveal_font_size // 6)
             pad_y = max(8, reveal_font_size // 6)
             # Introduce a small horizontal gap between adjacent underlines so
             # they don't visually touch. Compute a gap as a fraction of the
@@ -1720,7 +1720,7 @@ def render_video_moviepy(
             per
         except NameError:
             per = 1.0
-        safe_bottom_margin = 32
+        safe_bottom_margin = 48
         # Compute the full reveal image size once so every substring
         # clip can be rendered on that fixed canvas. This avoids changing
         # clip widths during the typewriter effect which would otherwise
@@ -1728,7 +1728,7 @@ def render_video_moviepy(
         try:
             full_rc = _make_text_imageclip(
                 text=word_en, font_size=128, color=(0, 0, 0),
-                extra_bottom=32, duration=1,
+                extra_bottom=48, duration=1,
             )
             full_w = (
                 getattr(full_rc, "w", None)
@@ -1755,7 +1755,7 @@ def render_video_moviepy(
             # can be drawn below glyphs without overlapping.
             rc = _make_text_imageclip(
                 text=sub, font_size=128, color=(0, 0, 0), duration=remaining,
-                extra_bottom=32, fixed_size=fixed_canvas,
+                extra_bottom=48, fixed_size=fixed_canvas,
             )
             # compute a y position so the reveal clip sits above the bottom
             # by safe_bottom_margin to avoid glyph descent clipping

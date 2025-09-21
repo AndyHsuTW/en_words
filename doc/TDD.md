@@ -17,8 +17,7 @@
 - **功能性（FR）**：
   - FR-INPUT：JSON 陣列輸入、欄位驗證、缺圖回退（白底）。
   - FR-LAYOUT：1920×1080\@30fps 版面；左上字母、右上中文+注音、左側計時器、中央圖像、底部 typewriter 揭示。
-  - FR-TIMER：10 秒倒數、左側黑底白字、最後 3 秒嗶聲（可關閉）。
-  - FR-AUDIO：單支 MP3 不循環與嗶聲混音、避免削波。
+  - FR-TIMER：10 秒倒數、左側黑底白字、最後 3 秒嗶聲（可關閉）、計時顯示可被隱藏但嗶聲仍可獨立控制。
   - FR-EXPORT：H.264(yuv420p, CRF 18–23)+AAC、檔名 `{word_en}.mp4`、片尾 1s 淡出。
   - FR-CLI/OPS：`batch` 模式、`--dry-run`、結構化日誌、失敗不中斷。
 - **非功能（NFR）**：可維運性（dry-run、日誌）、相容性（Win11 x64）。
@@ -64,6 +63,7 @@
 | TCS-TYPE-001     | Unit        | FR-LAYOUT | reveal\_hold=5                 | typewriter 遍歷完整字串，持續≥5s      |
 | TCS-AUDIO-001    | Unit        | FR-AUDIO  | `short.mp3`                    | 不循環；尾段靜音；峰值≤-1 dBTP          |
 | TCS-BEEP-001     | Unit        | FR-TIMER  | 最後 3 秒                         | 三段嗶聲可檢出；可關閉                  |
+| TCS-TIMER-HIDE   | Unit        | FR-TIMER  | 啟用 `--hide-timer` 或相等設定           | 畫面中不應顯示計時器區塊（畫面取樣應找不到計時 timer 的像素/區塊），但音訊仍包含最後 3 秒嗶聲（若 `--beep` 開啟）。 |
 | TCS-PIPE-001     | Integration | FR-LAYOUT | 合成一支 12s                       | 中間幀序正確；無例外                   |
 | TCS-PROG-001     | Unit        | FR-UI / FR-TIMER | 進度條基礎行為（countdown_sec=10） | 初始狀態顯示三段固定顏色（綠/黃/紅，寬度分別 50%/20%/30%）；隨倒數進行，進度條自左向右逐步消失，最終變空。 |
 | TCS-PROG-002     | Unit        | FR-UI     | 進度條更新率驗證                   | 進度條消失動畫以至少 10 fps 更新，消失過程應平滑且無像素跳動或閃爍。 |
@@ -78,6 +78,7 @@
 | TCS-DRYRUN-001   | E2E         | NFR       | `--dry-run`                    | 不輸出檔案；列出缺資產；exit code=0      |
 | TCS-BATCH-001    | E2E         | 批次驗收      | `batch --json data/words.json` | 每筆輸出 1 檔；彙總成功/失敗             |
 | TCS-BEEP-TOGGLE  | E2E         | FR-TIMER  | `--beep false`                 | 最後 3 秒無嗶聲頻段峰值                |
+| TCS-TIMER-HIDE-E2E| E2E        | FR-TIMER  | `--hide-timer --beep true`     | 不顯示畫面計時器，但最後 3 秒嗶聲仍會出現在輸出音軌；dry-run 應可驗證參數被接受且不影響資產檢查。 |
 | TCS-PRESET-001   | E2E         | FR-LAYOUT | `--effect-in=slide`            | 可成功輸出且具滑入效果                  |
 
 ---
