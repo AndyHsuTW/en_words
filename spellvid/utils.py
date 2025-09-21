@@ -41,25 +41,95 @@ except Exception:
 PROGRESS_BAR_SAFE_X = 64
 PROGRESS_BAR_MAX_X = 1856
 PROGRESS_BAR_WIDTH = PROGRESS_BAR_MAX_X - PROGRESS_BAR_SAFE_X
-PROGRESS_BAR_HEIGHT = 16
+PROGRESS_BAR_HEIGHT = 32
 PROGRESS_BAR_COLORS = {
-    "safe": (34, 197, 94),
-    "warn": (250, 204, 21),
-    "danger": (248, 113, 113),
+    "safe": (164, 223, 195),
+    "warn": (247, 228, 133),
+    "danger": (248, 187, 166),
 }
+PROGRESS_BAR_RATIOS = {
+    "safe": 0.5,
+    "warn": 0.2,
+    "danger": 0.3,
+}
+PROGRESS_BAR_CORNER_RADIUS = 16
 
 
-def _progress_bar_color_for_ratio(ratio: float) -> Tuple[int, int, int]:
-    """Return RGB color for progress bar based on remaining ratio."""
+def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
+    """Return color bands with absolute pixel spans for the progress bar."""
+    order = ("safe", "warn", "danger")
+    layout: List[Dict[str, Any]] = []
+    cursor = 0
+    for idx, key in enumerate(order):
+        if idx == len(order) - 1:
+            end = bar_width
+        else:
+            width = int(round(bar_width * PROGRESS_BAR_RATIOS[key]))
+            end = min(bar_width, cursor + width)
+        end = max(cursor, end)
+        layout.append(
+            {
+                "name": key,
+                "color": PROGRESS_BAR_COLORS[key],
+                "start": cursor,
+                "end": end,
+            }
+        )
+        cursor = end
+    if layout:
+        layout[-1]["end"] = bar_width
+    return layout
+
+
+_progress_bar_cache: Dict[int, Tuple[_np.ndarray, _np.ndarray]] = {}
+
+
+def _progress_bar_base_arrays(bar_width: int) -> Tuple[_np.ndarray, _np.ndarray]:
+    """Return (color_rgb, alpha_mask) arrays for the segmented progress bar."""
+    cached = _progress_bar_cache.get(bar_width)
+    if cached:
+        return cached
+    height = PROGRESS_BAR_HEIGHT
+    color = _np.zeros((height, bar_width, 3), dtype=_np.uint8)
+    layout = _progress_bar_band_layout(bar_width)
+    for band in layout:
+        start = max(0, int(band["start"]))
+        end = max(start, min(bar_width, int(band["end"])))
+        if end <= start:
+            continue
+        color[:, start:end, 0] = band["color"][0]
+        color[:, start:end, 1] = band["color"][1]
+        color[:, start:end, 2] = band["color"][2]
+    mask_img = Image.new("L", (bar_width, height), 0)
+    draw = ImageDraw.Draw(mask_img)
+    draw.rounded_rectangle(
+        (0, 0, bar_width - 1, height - 1),
+        radius=PROGRESS_BAR_CORNER_RADIUS,
+        fill=255,
+    )
+    mask = _np.array(mask_img, dtype=_np.uint8)
+    _progress_bar_cache[bar_width] = (color, mask)
+    return color, mask
+
+
+def _make_progress_bar_mask(mask_slice: _np.ndarray, duration: float):
+    """Create a MoviePy ImageClip mask from an alpha slice."""
+    mask_arr = (mask_slice.astype(_np.float32) / 255.0)
+    import inspect as _inspect
+
+    mask_kwargs = {}
     try:
-        r = float(ratio)
+        params = _inspect.signature(_mpy.ImageClip.__init__).parameters
+        if "is_mask" in params:
+            mask_kwargs["is_mask"] = True
+        elif "ismask" in params:
+            mask_kwargs["ismask"] = True
     except Exception:
-        r = 0.0
-    if r > 0.5:
-        return PROGRESS_BAR_COLORS["safe"]
-    if r > 0.3:
-        return PROGRESS_BAR_COLORS["warn"]
-    return PROGRESS_BAR_COLORS["danger"]
+        mask_kwargs["ismask"] = True
+    if not mask_kwargs:
+        mask_kwargs["ismask"] = True
+    clip = _mpy.ImageClip(mask_arr, **mask_kwargs).with_duration(duration)
+    return clip
 
 
 def _build_progress_bar_segments(
@@ -69,7 +139,7 @@ def _build_progress_bar_segments(
     fps: int = 10,
     bar_width: int = PROGRESS_BAR_WIDTH,
 ) -> List[Dict[str, Any]]:
-    """Plan progress bar slices (start, end, color, width) across countdown."""
+    """Plan progress bar slices (start, end, width, spans) across countdown."""
     countdown = float(max(0.0, countdown))
     total_duration = float(max(total_duration, countdown))
     if fps <= 0 or bar_width <= 0:
@@ -79,13 +149,16 @@ def _build_progress_bar_segments(
             {
                 "start": 0.0,
                 "end": round(total_duration, 6),
-                "color": PROGRESS_BAR_COLORS["danger"],
                 "width": 0,
+                "x_start": bar_width,
+                "color_spans": [],
+                "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
             }
         ]
 
     import math as _math_local
 
+    layout = _progress_bar_band_layout(bar_width)
     step_count = max(1, int(_math_local.ceil(countdown * float(fps))))
     step = countdown / step_count
     segments: List[Dict[str, Any]] = []
@@ -98,27 +171,49 @@ def _build_progress_bar_segments(
         remaining = max(0.0, countdown - start)
         ratio = remaining / countdown if countdown else 0.0
         raw_width = int(round(bar_width * ratio))
-        width = min(prev_width, raw_width)
+        visible_width = min(prev_width, max(0, raw_width))
         if ratio > 0.0:
-            width = max(1, width)
+            if prev_width > 0:
+                visible_width = max(1, visible_width)
+            else:
+                visible_width = 0
         else:
-            width = 0
-        color = _progress_bar_color_for_ratio(ratio)
+            visible_width = 0
+        x_start = bar_width - visible_width if visible_width > 0 else bar_width
+        color_spans: List[Dict[str, Any]] = []
+        if visible_width > 0:
+            span_start = x_start
+            span_end = x_start + visible_width
+            for band in layout:
+                overlap_start = max(span_start, band["start"])
+                overlap_end = min(span_end, band["end"])
+                if overlap_end > overlap_start:
+                    color_spans.append(
+                        {
+                            "color": band["color"],
+                            "start": int(overlap_start),
+                            "end": int(overlap_end),
+                        }
+                    )
         segments.append(
             {
                 "start": round(float(start), 6),
                 "end": round(float(end), 6),
-                "color": color,
-                "width": int(width),
+                "width": int(visible_width),
+                "x_start": int(x_start),
+                "color_spans": color_spans,
+                "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
             }
         )
-        prev_width = width
+        prev_width = visible_width
     segments.append(
         {
             "start": round(float(countdown), 6),
             "end": round(float(total_duration), 6),
-            "color": _progress_bar_color_for_ratio(0.0),
             "width": 0,
+            "x_start": bar_width,
+            "color_spans": [],
+            "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
         }
     )
     return segments
@@ -1729,6 +1824,12 @@ def render_video_moviepy(
                     bar_y = min(max(0, candidate), base_bar_y)
             except Exception:
                 bar_y = base_bar_y
+        try:
+            base_color, base_mask = _progress_bar_base_arrays(
+                PROGRESS_BAR_WIDTH)
+        except Exception:
+            base_color = None
+            base_mask = None
         for seg in progress_segments:
             width = int(seg.get("width", 0))
             if width <= 0:
@@ -1738,16 +1839,36 @@ def render_video_moviepy(
             seg_duration = max(0.0, seg_end - seg_start)
             if seg_duration <= 0.0:
                 continue
-            color = tuple(seg.get("color", PROGRESS_BAR_COLORS["safe"]))
+            x_start = int(seg.get("x_start", PROGRESS_BAR_WIDTH - width))
+            if base_color is None or base_mask is None:
+                continue
+            if x_start < 0:
+                x_start = 0
+            x_end = min(PROGRESS_BAR_WIDTH, x_start + width)
+            if x_end <= x_start:
+                continue
+            color_slice = base_color[:, x_start:x_end, :]
+            mask_slice = base_mask[:, x_start:x_end]
+            if color_slice.size == 0 or mask_slice.size == 0:
+                continue
             try:
-                frame = _np.zeros((PROGRESS_BAR_HEIGHT, width, 3), dtype=_np.uint8)
-                frame[..., 0] = color[0]
-                frame[..., 1] = color[1]
-                frame[..., 2] = color[2]
-                clip = _mpy.ImageClip(frame).with_duration(seg_duration)
+                clip = _mpy.ImageClip(
+                    color_slice.copy()).with_duration(seg_duration)
             except Exception:
                 continue
-            clip = clip.with_start(seg_start).with_position((PROGRESS_BAR_SAFE_X, bar_y))
+            mask_clip = None
+            try:
+                mask_clip = _make_progress_bar_mask(mask_slice, seg_duration)
+            except Exception:
+                mask_clip = None
+            if mask_clip is not None:
+                try:
+                    clip = clip.with_mask(mask_clip)
+                except Exception:
+                    mask_clip = None
+            clip = clip.with_start(seg_start).with_position(
+                (PROGRESS_BAR_SAFE_X + x_start, bar_y)
+            )
             clips.append(clip)
 
     final = _mpy.CompositeVideoClip(clips, size=(1920, 1080))
@@ -1940,4 +2061,3 @@ def render_video_moviepy(
         "bg_placement": bg_placement,
         "progress_bar_segments": progress_segments,
     }
-
