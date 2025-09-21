@@ -17,7 +17,8 @@ param(
     [string]$Json = "config.json",
     [string]$OutDir = "out",
     [switch]$UseMoviepy = $true,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [bool]$HideTimer = $true
 )
 
 $venv = "C:\Projects\en_words\.venv\Scripts\Activate.ps1"
@@ -41,6 +42,7 @@ $pythonArgs += "--out-dir"
 $pythonArgs += $OutDir
 if ($UseMoviepy) { $pythonArgs += "--use-moviepy" }
 if ($DryRun) { $pythonArgs += "--dry-run" }
+if ($HideTimer) { $pythonArgs += "--hide-timer" } else { $pythonArgs += "--timer-visible" }
 if ($OutFile -ne "") { $pythonArgs += "--out-file"; $pythonArgs += $OutFile }
 
 Write-Host "Running: python $($pythonArgs -join ' ')"
@@ -53,3 +55,4 @@ if ($LASTEXITCODE -eq 0) {
         C:\Projects\en_words\FFmpeg\ffprobe.exe -v error -show_entries stream=index,codec_type,codec_name -of default=noprint_wrappers=1 $_.FullName
     }
 }
+

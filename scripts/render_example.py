@@ -37,6 +37,8 @@ parser.add_argument(
 )
 parser.add_argument("--use-moviepy", action="store_true")
 parser.add_argument("--dry-run", action="store_true")
+parser.add_argument("--hide-timer", dest="timer_visible",
+                    action="store_false")
 args = parser.parse_args()
 
 os.makedirs(args.out_dir, exist_ok=True)
@@ -166,8 +168,11 @@ if args.json_path and os.path.isfile(args.json_path):
 
     temp_outputs = []
     try:
+        timer_override = args.timer_visible
         for idx, item in enumerate(cfg):
             name = item.get('word_en') or item.get('letters') or f'out_{idx}'
+            if timer_override is not None:
+                item['timer_visible'] = bool(timer_override)
             # default filename from config
             fname = sanitize_name(name) + '.mp4'
             outp = os.path.join(args.out_dir, fname)

@@ -12,6 +12,7 @@ def make(args: argparse.Namespace) -> int:
         "music_path": args.music,
         "countdown_sec": args.countdown,
         "reveal_hold_sec": args.reveal_hold,
+        "timer_visible": args.timer_visible,
         "progress_bar": args.progress_bar,
     }
     out = args.out
@@ -39,7 +40,9 @@ def batch(args: argparse.Namespace) -> int:
             print("WARNING: image missing for", item.get("word_en"))
         out_path = os.path.join(args.outdir, f"{item['word_en']}.mp4")
         if "progress_bar" not in item:
-            item["progress_bar"] = args.progress_bar
+            item["progress_bar"] = getattr(args, "progress_bar", True)
+        if "timer_visible" not in item:
+            item["timer_visible"] = getattr(args, "timer_visible", True)
 
         try:
             res = utils.render_video_stub(
@@ -86,7 +89,19 @@ def build_parser():
         action="store_false",
         help="disable bottom progress bar overlay",
     )
-    p_make.set_defaults(progress_bar=True)
+    p_make.add_argument(
+        "--timer-visible",
+        dest="timer_visible",
+        action="store_true",
+        help="show countdown timer (default)",
+    )
+    p_make.add_argument(
+        "--hide-timer",
+        dest="timer_visible",
+        action="store_false",
+        help="hide countdown timer overlay",
+    )
+    p_make.set_defaults(progress_bar=True, timer_visible=True)
 
     p_make.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"
@@ -108,7 +123,19 @@ def build_parser():
         action="store_false",
         help="disable bottom progress bar overlay",
     )
-    p_batch.set_defaults(progress_bar=True)
+    p_batch.add_argument(
+        "--timer-visible",
+        dest="timer_visible",
+        action="store_true",
+        help="show countdown timer (default)",
+    )
+    p_batch.add_argument(
+        "--hide-timer",
+        dest="timer_visible",
+        action="store_false",
+        help="hide countdown timer overlay",
+    )
+    p_batch.set_defaults(progress_bar=True, timer_visible=True)
 
     p_batch.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"

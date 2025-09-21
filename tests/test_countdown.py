@@ -1,4 +1,9 @@
 import pytest
+from spellvid import utils
+
+
+def _has_moviepy():
+    return getattr(utils, "_HAS_MOVIEPY", False)
 
 
 def test_countdown_includes_zero_zero():
@@ -74,3 +79,50 @@ def test_countdown_includes_zero_zero():
         visible = (frame.astype(int).sum(axis=2) > 0).any()
 
     assert visible, "Rendered '00:00' frame has no visible pixels"
+
+
+def test_render_moviepy_hide_timer_dry_run_keeps_beeps(tmp_path):
+    """When timer is hidden, dry-run metadata should omit timer clips but keep beep schedule."""
+    if not _has_moviepy():
+        pytest.skip("MoviePy not available; skipping timer visibility test")
+
+    item = {
+        "letters": "H",
+        "word_en": "Hide",
+        "word_zh": "藏",
+        "image_path": "",
+        "music_path": "",
+        "countdown_sec": 5,
+        "reveal_hold_sec": 2,
+        "timer_visible": False,
+    }
+    out_path = tmp_path / "hide_timer.mp4"
+    res = utils.render_video_moviepy(item, str(out_path), dry_run=True)
+
+    assert res["status"] == "dry-run"
+    assert res["timer_visible"] is False
+    assert res["timer_plan"] == []
+    # countdown=5 -> beeps occur when displaying 03,02,01 -> times 2s, 3s, 4s
+    assert res["beep_schedule"] == [2.0, 3.0, 4.0]
+
+
+
+def test_compute_layout_marks_timer_hidden():
+    """Headless layout helper should mark timer box as hidden when timer_visible=False."""
+    item = {
+        "letters": "H",
+        "word_en": "Hide",
+        "word_zh": "藏",
+        "image_path": "",
+        "music_path": "",
+        "timer_visible": False,
+    }
+
+    boxes = utils.compute_layout_bboxes(item)
+    timer_box = boxes.get("timer")
+    assert timer_box is not None
+    assert timer_box.get("visible") is False
+    # dimensions still reserved to preserve layout alignment
+    assert timer_box.get("w", 0) > 0
+    assert timer_box.get("h", 0) > 0
+

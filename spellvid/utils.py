@@ -55,6 +55,25 @@ PROGRESS_BAR_RATIOS = {
 PROGRESS_BAR_CORNER_RADIUS = 16
 
 
+def _coerce_bool(value: Any, default: bool = True) -> bool:
+    """Return a boolean, accepting common string/int representations."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if not val:
+            return default
+        if val in {"false", "0", "off", "no", "n"}:
+            return False
+        if val in {"true", "1", "on", "yes", "y"}:
+            return True
+    return bool(value)
+
+
 def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
     """Return color bands with absolute pixel spans for the progress bar."""
     order = ("safe", "warn", "danger")
@@ -446,6 +465,7 @@ SCHEMA = {
             "countdown_sec": {"type": "integer"},
             "reveal_hold_sec": {"type": "integer"},
             "progress_bar": {"type": "boolean", "default": True},
+            "timer_visible": {"type": "boolean", "default": True},
             "theme": {"type": "string"},
             "video_mode": {
                 "type": "string",
@@ -660,6 +680,7 @@ def compute_layout_bboxes(
 
         pos_x = w_vid - 64 - img_w
         boxes["zh"] = {"x": pos_x, "y": 64, "w": img_w, "h": img_h}
+    timer_visible = _coerce_bool(item.get("timer_visible", True))
     timer_font_size = 64
     try:
         # use the same font selection logic as _make_text_imageclip so
@@ -683,6 +704,7 @@ def compute_layout_bboxes(
         "w": img_w,
         "h": img_h,
         "font_size": timer_font_size,
+        "visible": timer_visible,
     }
 
     # Reveal area (center bottom) - approximate width for longest word_en
@@ -917,8 +939,52 @@ def render_video_stub(
     if use_moviepy and _HAS_MOVIEPY:
         return render_video_moviepy(item, out_path, dry_run=dry_run)
 
+    countdown = int(item.get("countdown_sec", 10))
+    reveal_hold = int(item.get("reveal_hold_sec", 5))
+    word_en = item.get("word_en", "")
+    n_for_timing = max(1, len(word_en))
+    per = 1.0
+    total_reveal_time = per * n_for_timing
+    duration = float(countdown + total_reveal_time + reveal_hold)
+
+    progress_enabled = bool(item.get("progress_bar", True))
+    progress_segments: List[Dict[str, Any]] = []
+    if progress_enabled:
+        progress_segments = _build_progress_bar_segments(countdown, duration)
+
+    timer_visible = _coerce_bool(item.get("timer_visible", True))
+    timer_plan: List[Dict[str, Any]] = []
+    if timer_visible:
+        for i in range(countdown + 1):
+            sec_left = max(0, countdown - i)
+            mm = sec_left // 60
+            ss = sec_left % 60
+            timer_text = f"{mm:02d}:{ss:02d}"
+            timer_duration = float(duration - i) if i == countdown else 1.0
+            if timer_duration < 0:
+                timer_duration = 0.0
+            timer_plan.append(
+                {
+                    "start": float(i),
+                    "text": timer_text,
+                    "duration": float(timer_duration),
+                }
+            )
+
+    beep_schedule: List[float] = []
+    for S in (3, 2, 1):
+        if S <= countdown:
+            beep_schedule.append(float(max(0.0, countdown - S)))
+
     if dry_run:
-        return {"status": "dry-run", "out": out_path, "progress_bar_segments": []}
+        return {
+            "status": "dry-run",
+            "out": out_path,
+            "progress_bar_segments": progress_segments,
+            "timer_visible": timer_visible,
+            "timer_plan": timer_plan,
+            "beep_schedule": beep_schedule,
+        }
     # ensure out dir
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     # Try to write a minimal valid mp4 using ffmpeg if available
@@ -927,7 +993,14 @@ def render_video_stub(
         # fallback to a tiny placeholder header (not a valid mp4 but keeps API)
         with open(out_path, "wb") as f:
             f.write(b"MP4")
-    return {"status": "ok", "out": out_path, "progress_bar_segments": []}
+    return {
+        "status": "ok",
+        "out": out_path,
+        "progress_bar_segments": progress_segments,
+        "timer_visible": timer_visible,
+        "timer_plan": timer_plan,
+        "beep_schedule": beep_schedule,
+    }
 
 
 def render_video_moviepy(
@@ -965,8 +1038,39 @@ def render_video_moviepy(
     if progress_enabled:
         progress_segments = _build_progress_bar_segments(countdown, duration)
 
+    timer_visible = _coerce_bool(item.get("timer_visible", True))
+    timer_plan: List[Dict[str, Any]] = []
+    if timer_visible:
+        for i in range(countdown + 1):
+            sec_left = max(0, countdown - i)
+            mm = sec_left // 60
+            ss = sec_left % 60
+            timer_text = f"{mm:02d}:{ss:02d}"
+            timer_duration = float(duration - i) if i == countdown else 1.0
+            if timer_duration < 0:
+                timer_duration = 0.0
+            timer_plan.append(
+                {
+                    "start": float(i),
+                    "text": timer_text,
+                    "duration": float(timer_duration),
+                }
+            )
+
+    beep_schedule: List[float] = []
+    for S in (3, 2, 1):
+        if S <= countdown:
+            beep_schedule.append(float(max(0.0, countdown - S)))
+
     if dry_run:
-        return {"status": "dry-run", "out": out_path, "progress_bar_segments": progress_segments}
+        return {
+            "status": "dry-run",
+            "out": out_path,
+            "progress_bar_segments": progress_segments,
+            "timer_visible": timer_visible,
+            "timer_plan": timer_plan,
+            "beep_schedule": beep_schedule,
+        }
 
     # compute reveal clip size early so we can avoid placing the background
     # such that it overlaps the reveal area. This uses the same _make_text
@@ -1685,27 +1789,24 @@ def render_video_moviepy(
             t = t.with_position((1920 - 64 - t.w, 64)).with_duration(duration)
             clips.append(t)
 
-    # Timer: create per-second TextClips placed at start times
-    # Also keep the final timer display until end of video
-    for i in range(countdown + 1):
-        sec_left = max(0, countdown - i)
-        mm = sec_left // 60
-        ss = sec_left % 60
-        timer_text = f"{mm:02d}:{ss:02d}"
-        # For the last timer (i == countdown), extend duration to
-        # end of video so the display includes 00:00 and remains until
-        # the reveal period.
-        timer_duration = duration - i if i == countdown else 1
-        tclip = _make_text_imageclip(
-            text=timer_text,
-            font_size=64,
-            color=(255, 255, 255),
-            bg=(0, 0, 0),
-            duration=timer_duration,
-        )
-        # moved down from 420 to 450 to avoid bottom clipping
-        tclip = tclip.with_position((64, 450)).with_start(i)
-        clips.append(tclip)
+    # Timer overlay: create per-second TextClips when visible.
+    if timer_visible and timer_plan:
+        for entry in timer_plan:
+            timer_text = entry.get("text", "")
+            timer_duration = max(0.0, float(entry.get("duration", 0.0)))
+            if timer_duration == 0.0:
+                continue
+            start_time = float(entry.get("start", 0.0))
+            tclip = _make_text_imageclip(
+                text=timer_text,
+                font_size=64,
+                color=(255, 255, 255),
+                bg=(0, 0, 0),
+                duration=timer_duration,
+            )
+            # moved down from 420 to 450 to avoid bottom clipping
+            tclip = tclip.with_position((64, 450)).with_start(start_time)
+            clips.append(tclip)
 
     # Reveal typewriter: show substrings sequentially. Each letter appears
     # at a fixed interval (`per` seconds). Each substring clip is started
@@ -1946,13 +2047,8 @@ def render_video_moviepy(
             # keep going — renderer can still produce video without music
             pass
 
-    # beep: generate short sine beeps at the times when the on-screen
-    # countdown displays 03, 02, 01. Previously these were placed in the
-    # last N seconds of the video which caused them to play at the end of
-    # the file regardless of the configured countdown. Compute the
-    # absolute start times by mapping the remaining seconds to the
-    # timeline: when the timer shows S (e.g. 3) that display appears at
-    # time (countdown - S).
+    # beep: generate short sine beeps aligned to the countdown display
+    # using the precomputed schedule from timer visibility planning.
     def make_beep(start_sec):
         freq = 1000.0
         length = 0.3
@@ -1971,17 +2067,11 @@ def render_video_moviepy(
         ac = _mpy.AudioClip(make_frame, duration=length, fps=44100)
         return ac.with_start(start_sec)
 
-    # determine which countdown numbers to beep for (3,2,1) but only
-    # include those that are <= configured countdown. For each target S
-    # the on-screen display for S appears at time (countdown - S).
-    beep_targets = [3, 2, 1]
-    for S in beep_targets:
-        if S <= countdown:
-            start = float(max(0.0, countdown - S))
-            try:
-                audio_clips.append(make_beep(start))
-            except Exception:
-                pass
+    for start in beep_schedule:
+        try:
+            audio_clips.append(make_beep(start))
+        except Exception:
+            pass
 
     if audio_clips:
         try:
@@ -2025,6 +2115,9 @@ def render_video_moviepy(
             "audio_loaded": audio_loaded,
             "audio_error": audio_error,
             "progress_bar_segments": progress_segments,
+            "timer_visible": timer_visible,
+            "timer_plan": timer_plan,
+            "beep_schedule": beep_schedule,
         }
 
     # write the file
@@ -2060,4 +2153,7 @@ def render_video_moviepy(
         "audio_error": audio_error,
         "bg_placement": bg_placement,
         "progress_bar_segments": progress_segments,
+        "timer_visible": timer_visible,
+        "timer_plan": timer_plan,
+        "beep_schedule": beep_schedule,
     }
