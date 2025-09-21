@@ -12,6 +12,7 @@ def make(args: argparse.Namespace) -> int:
         "music_path": args.music,
         "countdown_sec": args.countdown,
         "reveal_hold_sec": args.reveal_hold,
+        "progress_bar": args.progress_bar,
     }
     out = args.out
     res = utils.render_video_stub(
@@ -37,6 +38,9 @@ def batch(args: argparse.Namespace) -> int:
         if not assets["image_exists"]:
             print("WARNING: image missing for", item.get("word_en"))
         out_path = os.path.join(args.outdir, f"{item['word_en']}.mp4")
+        if "progress_bar" not in item:
+            item["progress_bar"] = args.progress_bar
+
         try:
             res = utils.render_video_stub(
                 item,
@@ -71,6 +75,20 @@ def build_parser():
     p_make.add_argument("--out", dest="out", default="out/output.mp4")
     p_make.add_argument("--dry-run", action="store_true", dest="dry_run")
     p_make.add_argument(
+        "--progress-bar",
+        dest="progress_bar",
+        action="store_true",
+        help="enable bottom progress bar (default)",
+    )
+    p_make.add_argument(
+        "--no-progress-bar",
+        dest="progress_bar",
+        action="store_false",
+        help="disable bottom progress bar overlay",
+    )
+    p_make.set_defaults(progress_bar=True)
+
+    p_make.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"
     )
 
@@ -78,6 +96,20 @@ def build_parser():
     p_batch.add_argument("--json")
     p_batch.add_argument("--outdir", default="out")
     p_batch.add_argument("--dry-run", action="store_true", dest="dry_run")
+    p_batch.add_argument(
+        "--progress-bar",
+        dest="progress_bar",
+        action="store_true",
+        help="enable bottom progress bar (default)",
+    )
+    p_batch.add_argument(
+        "--no-progress-bar",
+        dest="progress_bar",
+        action="store_false",
+        help="disable bottom progress bar overlay",
+    )
+    p_batch.set_defaults(progress_bar=True)
+
     p_batch.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"
     )

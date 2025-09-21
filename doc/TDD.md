@@ -65,10 +65,11 @@
 | TCS-AUDIO-001    | Unit        | FR-AUDIO  | `short.mp3`                    | 不循環；尾段靜音；峰值≤-1 dBTP          |
 | TCS-BEEP-001     | Unit        | FR-TIMER  | 最後 3 秒                         | 三段嗶聲可檢出；可關閉                  |
 | TCS-PIPE-001     | Integration | FR-LAYOUT | 合成一支 12s                       | 中間幀序正確；無例外                   |
-| TCS-PROG-001     | Unit        | FR-UI / FR-TIMER | 進度條基礎行為（countdown_sec=10） | 在 10~5s 顯示綠色、5~3s 顯示黃、3~0s 顯示紅；進度條從滿遞減至空。 |
-| TCS-PROG-002     | Unit        | FR-UI     | 進度條更新率驗證                   | 進度條以至少 10 fps 更新，顏色切換平滑無閃爍。 |
-| TCS-PROG-003     | Integration | FR-UI     | 非 10s 倒數（比例分段）             | 當 `countdown_sec` 非 10，進度條按比例分段（綠 50%、黃 20%、紅 30%）且顏色切換時間點符合預期。 |
-| TCS-PROG-004     | Integration | FR-TIMER / FR-AUDIO | 嗶聲同步                         | 啟用 `--beep` 時，最後 3 秒嗶聲與進度條變為紅色的時間段同步發生；使用音訊/波形檢查驗證。 |
+| TCS-PROG-001     | Unit        | FR-UI / FR-TIMER | 進度條基礎行為（countdown_sec=10） | 初始狀態顯示三段固定顏色（綠/黃/紅，寬度分別 50%/20%/30%）；隨倒數進行，進度條自左向右逐步消失，最終變空。 |
+| TCS-PROG-002     | Unit        | FR-UI     | 進度條更新率驗證                   | 進度條消失動畫以至少 10 fps 更新，消失過程應平滑且無像素跳動或閃爍。 |
+| TCS-PROG-003     | Integration | FR-UI     | 非 10s 倒數（比例分段）             | 當 `countdown_sec` 非 10，三段顏色寬度仍為 50%/20%/30%（固定），但消失速率依倒數時長線性調整；檢查消失進度與時間吻合。 |
+| TCS-PROG-004     | Integration | FR-TIMER / FR-AUDIO | 嗶聲同步                         | 啟用 `--beep` 時，最後 3 秒嗶聲的時間窗應與進度條右側紅段即將消失的時間窗重疊；以音訊波形與畫面時間點驗證同步性。 |
+| TCS-PROG-005     | Integration | FR-UI     | 圓角樣式與抗鋸齒驗證                 | 進度條邊緣應為圓角（預設半徑 8 px）；在取樣邊緣時應觀察到平滑無明顯鋸齒（使用 OpenCV 邊緣檢測與中位色檢查）。 |
 | TCS-FALLBACK-001 | Integration | FR-INPUT  | 缺 `image_path` 或視覺資產不是存在的圖片/影片 | 以白底圖合成；畫面取樣接近 #FFFFFF        |
 | TCS-EXPORT-001   | Integration | FR-EXPORT | ffprobe 檢查                     | h264 / yuv420p / 30fps / aac |
 | TCS-EXPORT-002   | Integration | FR-EXPORT | word\_en=Ice                   | 檔名 `Ice.mp4` 於 `out/`        |

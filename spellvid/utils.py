@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 import numpy as _np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -38,6 +38,90 @@ except Exception:
         _mpy_config = None
         _HAS_MOVIEPY = False
 
+PROGRESS_BAR_SAFE_X = 64
+PROGRESS_BAR_MAX_X = 1856
+PROGRESS_BAR_WIDTH = PROGRESS_BAR_MAX_X - PROGRESS_BAR_SAFE_X
+PROGRESS_BAR_HEIGHT = 16
+PROGRESS_BAR_COLORS = {
+    "safe": (34, 197, 94),
+    "warn": (250, 204, 21),
+    "danger": (248, 113, 113),
+}
+
+
+def _progress_bar_color_for_ratio(ratio: float) -> Tuple[int, int, int]:
+    """Return RGB color for progress bar based on remaining ratio."""
+    try:
+        r = float(ratio)
+    except Exception:
+        r = 0.0
+    if r > 0.5:
+        return PROGRESS_BAR_COLORS["safe"]
+    if r > 0.3:
+        return PROGRESS_BAR_COLORS["warn"]
+    return PROGRESS_BAR_COLORS["danger"]
+
+
+def _build_progress_bar_segments(
+    countdown: float,
+    total_duration: float,
+    *,
+    fps: int = 10,
+    bar_width: int = PROGRESS_BAR_WIDTH,
+) -> List[Dict[str, Any]]:
+    """Plan progress bar slices (start, end, color, width) across countdown."""
+    countdown = float(max(0.0, countdown))
+    total_duration = float(max(total_duration, countdown))
+    if fps <= 0 or bar_width <= 0:
+        return []
+    if countdown == 0.0:
+        return [
+            {
+                "start": 0.0,
+                "end": round(total_duration, 6),
+                "color": PROGRESS_BAR_COLORS["danger"],
+                "width": 0,
+            }
+        ]
+
+    import math as _math_local
+
+    step_count = max(1, int(_math_local.ceil(countdown * float(fps))))
+    step = countdown / step_count
+    segments: List[Dict[str, Any]] = []
+    prev_width = bar_width
+    for idx in range(step_count):
+        start = min(countdown, idx * step)
+        end = min(countdown, (idx + 1) * step)
+        if end <= start:
+            continue
+        remaining = max(0.0, countdown - start)
+        ratio = remaining / countdown if countdown else 0.0
+        raw_width = int(round(bar_width * ratio))
+        width = min(prev_width, raw_width)
+        if ratio > 0.0:
+            width = max(1, width)
+        else:
+            width = 0
+        color = _progress_bar_color_for_ratio(ratio)
+        segments.append(
+            {
+                "start": round(float(start), 6),
+                "end": round(float(end), 6),
+                "color": color,
+                "width": int(width),
+            }
+        )
+        prev_width = width
+    segments.append(
+        {
+            "start": round(float(countdown), 6),
+            "end": round(float(total_duration), 6),
+            "color": _progress_bar_color_for_ratio(0.0),
+            "width": 0,
+        }
+    )
+    return segments
 # If MoviePy is available, try to configure which ffmpeg binary to use.
 
 
@@ -266,6 +350,7 @@ SCHEMA = {
             "music_path": {"type": "string"},
             "countdown_sec": {"type": "integer"},
             "reveal_hold_sec": {"type": "integer"},
+            "progress_bar": {"type": "boolean", "default": True},
             "theme": {"type": "string"},
             "video_mode": {
                 "type": "string",
@@ -738,7 +823,7 @@ def render_video_stub(
         return render_video_moviepy(item, out_path, dry_run=dry_run)
 
     if dry_run:
-        return {"status": "dry-run", "out": out_path}
+        return {"status": "dry-run", "out": out_path, "progress_bar_segments": []}
     # ensure out dir
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     # Try to write a minimal valid mp4 using ffmpeg if available
@@ -747,7 +832,7 @@ def render_video_stub(
         # fallback to a tiny placeholder header (not a valid mp4 but keeps API)
         with open(out_path, "wb") as f:
             f.write(b"MP4")
-    return {"status": "ok", "out": out_path}
+    return {"status": "ok", "out": out_path, "progress_bar_segments": []}
 
 
 def render_video_moviepy(
@@ -780,8 +865,13 @@ def render_video_moviepy(
     # plus post-reveal hold
     duration = float(countdown + total_reveal_time + reveal_hold)
 
+    progress_enabled = bool(item.get("progress_bar", True))
+    progress_segments: List[Dict[str, Any]] = []
+    if progress_enabled:
+        progress_segments = _build_progress_bar_segments(countdown, duration)
+
     if dry_run:
-        return {"status": "dry-run", "out": out_path}
+        return {"status": "dry-run", "out": out_path, "progress_bar_segments": progress_segments}
 
     # compute reveal clip size early so we can avoid placing the background
     # such that it overlaps the reveal area. This uses the same _make_text
@@ -1627,6 +1717,39 @@ def render_video_moviepy(
             except Exception:
                 pass
 
+    if progress_enabled and progress_segments:
+        base_bar_y = 1080 - PROGRESS_BAR_HEIGHT - 24
+        bar_y = base_bar_y
+        if reveal_placement:
+            try:
+                _, rp_y, _, rp_h = reveal_placement
+                if rp_y is not None and rp_h is not None:
+                    reveal_bottom = int(rp_y) + int(rp_h)
+                    candidate = reveal_bottom + 24
+                    bar_y = min(max(0, candidate), base_bar_y)
+            except Exception:
+                bar_y = base_bar_y
+        for seg in progress_segments:
+            width = int(seg.get("width", 0))
+            if width <= 0:
+                continue
+            seg_start = float(seg.get("start", 0.0))
+            seg_end = float(seg.get("end", seg_start))
+            seg_duration = max(0.0, seg_end - seg_start)
+            if seg_duration <= 0.0:
+                continue
+            color = tuple(seg.get("color", PROGRESS_BAR_COLORS["safe"]))
+            try:
+                frame = _np.zeros((PROGRESS_BAR_HEIGHT, width, 3), dtype=_np.uint8)
+                frame[..., 0] = color[0]
+                frame[..., 1] = color[1]
+                frame[..., 2] = color[2]
+                clip = _mpy.ImageClip(frame).with_duration(seg_duration)
+            except Exception:
+                continue
+            clip = clip.with_start(seg_start).with_position((PROGRESS_BAR_SAFE_X, bar_y))
+            clips.append(clip)
+
     final = _mpy.CompositeVideoClip(clips, size=(1920, 1080))
     final = final.with_duration(duration)
 
@@ -1780,6 +1903,7 @@ def render_video_moviepy(
             "bg_error": bg_error,
             "audio_loaded": audio_loaded,
             "audio_error": audio_error,
+            "progress_bar_segments": progress_segments,
         }
 
     # write the file
@@ -1814,4 +1938,6 @@ def render_video_moviepy(
         "audio_loaded": audio_loaded,
         "audio_error": audio_error,
         "bg_placement": bg_placement,
+        "progress_bar_segments": progress_segments,
     }
+
