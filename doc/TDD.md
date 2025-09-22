@@ -57,6 +57,7 @@
 | ---------------- | ----------- | --------- | ------------------------------ | ---------------------------- |
 | TCS-SCHEMA-001   | Unit        | FR-INPUT  | JSON 含未知欄位                     | 驗證 Schema 拒絕並回報欄位名           |
 | TCS-SCHEMA-002   | Unit        | FR-INPUT  | 省略 countdown/reveal            | 使用預設 10/5                    |
+| TCS-LETTERS-001  | Unit        | FR-LAYOUT | `letters` 使用圖片資源（assets/AZ/） | 程式應能載入 `{LETTER}.png` 與 `{letter}_small.png`，多字元按序排列；若圖片缺失，畫面應保留該字元位置為空白（不以文字替代），並在日誌中記錄 WARNING。 |
 | TCS-ZHUYIN-001   | Unit        | FR-INPUT  | `word_zh=冰塊`                   | 產生注音（ㄅㄧㄥ ㄎㄨㄞˋ），離線運作          |
 | TCS-LAYOUT-001   | Unit        | FR-LAYOUT | 計算四區域座標                        | 座標在 1920×1080 安全邊界內          |
 | TCS-TIMER-001    | Unit        | FR-TIMER  | 倒數 10 秒                        | 由 00:10 至 00:00，每秒更新         |
@@ -76,6 +77,7 @@
 | TCS-EXPORT-003   | Integration | FR-EXPORT | 片尾                             | 最末 1s 亮度趨降（淡出）               |
 | TCS-LOG-001      | Integration | FR-OPS    | 缺圖/缺音                          | 流程不中斷；日誌 WARNING             |
 | TCS-DRYRUN-001   | E2E         | NFR       | `--dry-run`                    | 不輸出檔案；列出缺資產；exit code=0      |
+| TCS-LETTERS-002  | Integration | FR-INPUT  | `--dry-run` 與 `letters` 圖片化       | dry-run 應驗證 `assets/AZ/` 中所需的字母圖片是否齊全；列出缺失圖片的檔名，並確認在正常執行模式下缺失字元位置會留白（非文字替代）。 |
 | TCS-BATCH-001    | E2E         | 批次驗收      | `batch --json data/words.json` | 每筆輸出 1 檔；彙總成功/失敗             |
 | TCS-BEEP-TOGGLE  | E2E         | FR-TIMER  | `--beep false`                 | 最後 3 秒無嗶聲頻段峰值                |
 | TCS-TIMER-HIDE-E2E| E2E        | FR-TIMER  | `--hide-timer --beep true`     | 不顯示畫面計時器，但最後 3 秒嗶聲仍會出現在輸出音軌；dry-run 應可驗證參數被接受且不影響資產檢查。 |

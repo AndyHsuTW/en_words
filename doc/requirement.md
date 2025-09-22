@@ -297,7 +297,10 @@ spellvid batch --json data/words.json --outdir out --beep true --dry-run false
 # 🎨 版面配置（Default Theme: 1920×1080）
 
 - **安全邊界（Safe Area）**：上下左右各 64 px。
-- **Letters（左上）**：x=64, y=48，字級 160（`Segoe UI`）。
+ - **Letters（左上）**：x=64, y=48，字級 160（`Segoe UI`）。
+   - 變更：左上顯示的英文字母改為使用預先準備的圖片資產，來源為 `assets/AZ/`。每個大寫字母使用檔名 `{LETTER}.png`（例如 `A.png`），對應小寫字母使用 `{letter}_small.png`（例如 `a_small.png`）。
+  - 命名規則與預設行為：若 `letters` 欄位包含多個字元（例如 `I i`），程式應按文字順序將對應的圖片水平排列，並以既有的安全邊界與間距（gap）自動縮放以符合左上區塊；若對應圖片不存在，則不顯示該字元的圖片（留白），並在日誌中記錄 WARNING；不得以文字自動替代顯示。
+  - CLI 參數影響：保留旗標 `--letters-as-image/--no-letters-as-image`（預設啟用），若使用者選擇 `--no-letters-as-image` 則始終以文字渲染；但在 `--letters-as-image` 模式下若資產缺失，行為為留白（不回退文字）。
 - **Timer（左側黑底白字）**：x=64, y=420，框 220×120，字級 64，格式 `MM:SS`。
 - **Chinese+Zhuyin（右上）**：右上對齊（x=1920-64, y=64），中文字級 96（`Microsoft JhengHei`），注音字級 48，置於中文下方一行；多字以空格分隔。
 - **Image / Video（中央）**：在 (x=320..1600, y=220..900) 的內容框內以 **contain** 等比縮放；若為影片，將影片裁切/縮放以置中並在輸出期間播放，以loop方式填滿時長。

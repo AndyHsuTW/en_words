@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 import numpy as _np
 from PIL import Image, ImageDraw, ImageFont
 
@@ -53,6 +53,240 @@ PROGRESS_BAR_RATIOS = {
     "danger": 0.3,
 }
 PROGRESS_BAR_CORNER_RADIUS = 16
+
+
+LETTER_SAFE_X = 64
+LETTER_SAFE_Y = 48
+LETTER_AVAILABLE_WIDTH = 1920 - (LETTER_SAFE_X * 2)
+LETTER_TARGET_HEIGHT = 220
+LETTER_BASE_GAP = -40  # 調整字母間距 (像素) - experimental negative gap
+LETTER_EXTRA_SCALE = 1.5
+
+_DEFAULT_LETTER_ASSET_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "assets", "AZ")
+)
+
+
+def _resolve_letter_asset_dir(item: Dict[str, Any] | None = None) -> str:
+    override = None
+    if item:
+        override = item.get("letters_asset_dir") or item.get(
+            "letters_assets_dir")
+    if not override:
+        override = os.environ.get("SPELLVID_LETTER_ASSET_DIR")
+    if override:
+        try:
+            return os.path.abspath(str(override))
+        except Exception:
+            return os.path.abspath(str(override))
+    return _DEFAULT_LETTER_ASSET_DIR
+
+
+def _normalize_letters_sequence(letters: str) -> List[str]:
+    if not letters:
+        return []
+    seq: List[str] = []
+    for ch in letters:
+        if not ch or ch.isspace():
+            continue
+        seq.append(ch)
+    return seq
+
+
+def _letter_asset_filename(ch: str) -> Optional[str]:
+    if not ch:
+        return None
+    if ch.isalpha():
+        if ch.isupper():
+            return f"{ch}.png"
+        if ch.islower():
+            return f"{ch}_small.png"
+    return None
+
+
+def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
+    seq = _normalize_letters_sequence(letters)
+    missing: List[Dict[str, Any]] = []
+    planned: List[Dict[str, Any]] = []
+    if not seq:
+        return {"letters": [], "missing": missing, "gap": 0, "bbox": {"w": 0, "h": 0}}
+
+    for ch in seq:
+        fname = _letter_asset_filename(ch)
+        if not fname:
+            missing.append({
+                "char": ch,
+                "filename": None,
+                "path": None,
+                "reason": "unsupported",
+            })
+            continue
+        path_str = os.path.join(asset_dir, fname)
+        if not os.path.isfile(path_str):
+            missing.append({
+                "char": ch,
+                "filename": fname,
+                "path": path_str,
+                "reason": "missing",
+            })
+            continue
+        try:
+            with Image.open(path_str) as img:
+                orig_w, orig_h = img.size
+        except Exception as exc:
+            missing.append({
+                "char": ch,
+                "filename": fname,
+                "path": path_str,
+                "reason": "unreadable",
+                "error": str(exc),
+            })
+            continue
+        planned.append({
+            "char": ch,
+            "filename": fname,
+            "path": path_str,
+            "orig_width": int(orig_w),
+            "orig_height": int(orig_h),
+        })
+
+    if not planned:
+        return {"letters": [], "missing": missing, "gap": 0, "bbox": {"w": 0, "h": 0}}
+
+    base_gap = LETTER_BASE_GAP
+    avail_width = LETTER_AVAILABLE_WIDTH
+    target_height = LETTER_TARGET_HEIGHT
+
+    scaled: List[Dict[str, Any]] = []
+    base_total_width = 0.0
+    for entry in planned:
+        orig_w = max(1, entry["orig_width"])
+        orig_h = max(1, entry["orig_height"])
+        base_scale = min(1.0, target_height / float(orig_h))
+        scaled.append(
+            {
+                **entry,
+                "base_scale": base_scale,
+                "orig_width": orig_w,
+                "orig_height": orig_h,
+            }
+        )
+        base_total_width += orig_w * base_scale * LETTER_EXTRA_SCALE
+
+    base_total_width += base_gap * LETTER_EXTRA_SCALE * max(0, len(scaled) - 1)
+
+    adjust = 1.0
+    if base_total_width > avail_width and base_total_width > 0:
+        adjust = avail_width / base_total_width
+
+    gap_px = 0
+    if len(scaled) > 1:
+        gap_px = int(round(base_gap * LETTER_EXTRA_SCALE * adjust))
+
+    cursor = 0
+    layout: List[Dict[str, Any]] = []
+    max_height = 0
+    min_x = None
+
+    for idx, entry in enumerate(scaled):
+        base_scale = entry["base_scale"]
+        orig_w = entry["orig_width"]
+        orig_h = entry["orig_height"]
+
+        pre_extra_scale = base_scale * adjust
+        orig_width_after_adjust = orig_w * pre_extra_scale
+        final_scale = pre_extra_scale * LETTER_EXTRA_SCALE
+
+        width_px = max(1, int(round(orig_w * final_scale)))
+        height_px = max(1, int(round(orig_h * final_scale)))
+        extend_left = int(round(orig_width_after_adjust * 0.5))
+        new_x = cursor - extend_left
+
+        layout_entry = {
+            "char": entry["char"],
+            "filename": entry["filename"],
+            "path": entry["path"],
+            "width": width_px,
+            "height": height_px,
+            "scale": final_scale,
+            "x": new_x,
+        }
+        layout.append(layout_entry)
+
+        if min_x is None or new_x < min_x:
+            min_x = new_x
+
+        cursor += width_px
+        if idx < len(scaled) - 1:
+            cursor += gap_px
+        if height_px > max_height:
+            max_height = height_px
+
+    if min_x is None:
+        min_x = 0
+    min_screen_x = LETTER_SAFE_X + min_x
+    if min_screen_x < 0:
+        shift = -min_screen_x
+        for entry in layout:
+            entry["x"] += shift
+        min_x += shift
+
+    total_width = 0
+    for entry in layout:
+        total_width = max(total_width, entry["x"] + entry["width"])
+
+    bbox = {"w": int(total_width), "h": max_height, "x_offset": int(min_x)}
+    return {"letters": layout, "missing": missing, "gap": gap_px, "bbox": bbox}
+
+
+def _letters_missing_names(missing: List[Dict[str, Any]]) -> List[str]:
+    names: List[str] = []
+    for entry in missing or []:
+        name = entry.get("filename") or entry.get("char")
+        if name:
+            name_str = str(name)
+            if name_str not in names:
+                names.append(name_str)
+    return names
+
+
+def _prepare_letters_context(item: Dict[str, Any]) -> Dict[str, Any]:
+    letters_text = str(item.get("letters", "") or "")
+    asset_dir = _resolve_letter_asset_dir(item)
+    mode = "image" if _coerce_bool(
+        item.get("letters_as_image", True)) else "text"
+    has_letters = bool(letters_text.strip())
+    layout = {"letters": [], "missing": [], "gap": 0, "bbox": {"w": 0, "h": 0}}
+    missing: List[Dict[str, Any]] = []
+    if has_letters and mode == "image":
+        layout = _plan_letter_images(letters_text, asset_dir)
+        missing = layout.get("missing", [])
+    filenames = [entry.get("filename") for entry in layout.get("letters", [])]
+    missing_names = _letters_missing_names(missing)
+    return {
+        "letters": letters_text,
+        "mode": mode,
+        "asset_dir": asset_dir,
+        "layout": layout,
+        "filenames": filenames,
+        "missing": missing,
+        "missing_names": missing_names,
+        "has_letters": has_letters,
+    }
+
+
+def _log_missing_letter_assets(missing: List[Dict[str, Any]]) -> None:
+    if not missing:
+        return
+    for entry in missing:
+        name = entry.get("filename") or entry.get("char") or "?"
+        path = entry.get("path")
+        reason = entry.get("reason") or "unavailable"
+        if path:
+            print(
+                f"WARNING: letters asset missing {name} ({reason}) at {path}")
+        else:
+            print(f"WARNING: letters asset missing {name} ({reason})")
 
 
 def _coerce_bool(value: Any, default: bool = True) -> bool:
@@ -466,6 +700,7 @@ SCHEMA = {
             "reveal_hold_sec": {"type": "integer"},
             "progress_bar": {"type": "boolean", "default": True},
             "timer_visible": {"type": "boolean", "default": True},
+            "letters_as_image": {"type": "boolean", "default": True},
             "theme": {"type": "string"},
             "video_mode": {
                 "type": "string",
@@ -564,21 +799,45 @@ def compute_layout_bboxes(
     # helper alias to module-level measurer
     measure_text = _measure_text_with_pil
 
+    letters_ctx = _prepare_letters_context(item)
+
     # Letters (top-left)
-    letters = item.get("letters", "")
-    if letters:
-        letters_y = 120  # updated to match renderer
-        font_size = 140
-        try:
-            font = ImageFont.load_default()
-        except Exception:
-            font = None
-        if font is None:
-            text_w = int(len(letters) * font_size * 0.6)
-            text_h = font_size
+    if letters_ctx.get("has_letters"):
+        if letters_ctx.get("mode") == "image":
+            layout = letters_ctx.get("layout", {})
+            bbox = layout.get("bbox", {}) or {}
+            min_x = int(bbox.get("x_offset", 0) or 0)
+            boxes["letters"] = {
+                "x": LETTER_SAFE_X + min_x,
+                "y": LETTER_SAFE_Y,
+                "w": int(bbox.get("w", 0) or 0),
+                "h": int(bbox.get("h", 0) or 0),
+                "mode": "image",
+                "gap": layout.get("gap", 0),
+                "missing": list(letters_ctx.get("missing_names", [])),
+            }
         else:
-            text_w, text_h = measure_text(letters, font)
-        boxes["letters"] = {"x": 64, "y": letters_y, "w": text_w, "h": text_h}
+            letters = letters_ctx.get("letters", "")
+            if letters:
+                letters_y = LETTER_SAFE_Y
+                font_size = 140
+                try:
+                    font = ImageFont.load_default()
+                except Exception:
+                    font = None
+                if font is None:
+                    text_w = int(len(letters) * font_size * 0.6)
+                    text_h = font_size
+                else:
+                    text_w, text_h = measure_text(letters, font)
+                boxes["letters"] = {
+                    "x": LETTER_SAFE_X,
+                    "y": letters_y,
+                    "w": text_w,
+                    "h": text_h,
+                    "mode": "text",
+                    "missing": [],
+                }
 
     # Chinese + zhuyin (top-right)
     word_zh = item.get("word_zh", "")
@@ -857,12 +1116,37 @@ def _make_fixed_letter_clip(
     )
 
 
-def check_assets(item: Dict[str, Any]) -> Dict[str, bool]:
-    res = {"image_exists": False, "music_exists": False}
+def check_assets(item: Dict[str, Any]) -> Dict[str, Any]:
+    res: Dict[str, Any] = {
+        "image_exists": False,
+        "music_exists": False,
+        "letters_mode": None,
+        "letters_assets": [],
+        "letters_missing": [],
+        "letters_missing_details": [],
+        "letters_asset_dir": None,
+        "letters_has_letters": False,
+    }
     if os.path.isfile(item.get("image_path", "")):
         res["image_exists"] = True
     if os.path.isfile(item.get("music_path", "")):
         res["music_exists"] = True
+    try:
+        letters_ctx = _prepare_letters_context(item)
+    except Exception:
+        letters_ctx = {
+            "mode": item.get("letters_as_image", True) and "image" or "text",
+            "filenames": [],
+            "missing_names": [],
+            "asset_dir": _resolve_letter_asset_dir(item),
+            "has_letters": bool(str(item.get("letters", "")).strip()),
+        }
+    res["letters_mode"] = letters_ctx.get("mode")
+    res["letters_assets"] = list(letters_ctx.get("filenames", []))
+    res["letters_missing"] = list(letters_ctx.get("missing_names", []))
+    res["letters_missing_details"] = list(letters_ctx.get("missing", []))
+    res["letters_asset_dir"] = letters_ctx.get("asset_dir")
+    res["letters_has_letters"] = bool(letters_ctx.get("has_letters"))
     return res
 
 
@@ -939,6 +1223,28 @@ def render_video_stub(
     if use_moviepy and _HAS_MOVIEPY:
         return render_video_moviepy(item, out_path, dry_run=dry_run)
 
+    letters_ctx = _prepare_letters_context(item)
+    letters_mode = letters_ctx.get("mode")
+    letters_assets = list(letters_ctx.get("filenames", []))
+    letters_missing_names = list(letters_ctx.get("missing_names", []))
+    letters_plan_entries = [
+        dict(entry) for entry in letters_ctx.get("layout", {}).get("letters", [])
+    ]
+    letters_layout = [
+        {
+            "filename": entry.get("filename"),
+            "width": entry.get("width"),
+            "height": entry.get("height"),
+            "x": entry.get("x"),
+        }
+        for entry in letters_plan_entries
+    ]
+    letters_asset_dir = letters_ctx.get("asset_dir")
+    letters_has_letters = bool(letters_ctx.get("has_letters"))
+    letters_missing_details = list(letters_ctx.get("missing", []))
+    if letters_mode == "image" and letters_missing_details:
+        _log_missing_letter_assets(letters_missing_details)
+
     countdown = int(item.get("countdown_sec", 10))
     reveal_hold = int(item.get("reveal_hold_sec", 5))
     word_en = item.get("word_en", "")
@@ -984,13 +1290,21 @@ def render_video_stub(
             "timer_visible": timer_visible,
             "timer_plan": timer_plan,
             "beep_schedule": beep_schedule,
+            "letters_mode": letters_mode,
+            "letters_assets": letters_assets,
+            "letters_missing": letters_missing_names,
+            # provide both a simple per-entry summary and the full
+            # layout plan (includes gap and bbox) for inspection
+            "letters_layout": letters_layout,
+            "letters_layout_plan": letters_ctx.get("layout", {}),
+            "letters_asset_dir": letters_asset_dir,
+            "letters_has_letters": letters_has_letters,
+            "letters_missing_details": letters_missing_details,
         }
-    # ensure out dir
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    # Try to write a minimal valid mp4 using ffmpeg if available
     created = _create_placeholder_mp4_with_ffmpeg(out_path)
     if not created:
-        # fallback to a tiny placeholder header (not a valid mp4 but keeps API)
         with open(out_path, "wb") as f:
             f.write(b"MP4")
     return {
@@ -1000,6 +1314,13 @@ def render_video_stub(
         "timer_visible": timer_visible,
         "timer_plan": timer_plan,
         "beep_schedule": beep_schedule,
+        "letters_mode": letters_mode,
+        "letters_assets": letters_assets,
+        "letters_missing": letters_missing_names,
+        "letters_layout": letters_layout,
+        "letters_asset_dir": letters_asset_dir,
+        "letters_has_letters": letters_has_letters,
+        "letters_missing_details": letters_missing_details,
     }
 
 
@@ -1062,6 +1383,27 @@ def render_video_moviepy(
         if S <= countdown:
             beep_schedule.append(float(max(0.0, countdown - S)))
 
+    letters_ctx = _prepare_letters_context(item)
+    letters_mode = letters_ctx.get("mode")
+    letters_assets = list(letters_ctx.get("filenames", []))
+    letters_missing_names = list(letters_ctx.get("missing_names", []))
+    letters_plan_entries = [dict(entry) for entry in letters_ctx.get(
+        "layout", {}).get("letters", [])]
+    letters_layout = [
+        {
+            "filename": entry.get("filename"),
+            "width": entry.get("width"),
+            "height": entry.get("height"),
+            "x": entry.get("x"),
+        }
+        for entry in letters_plan_entries
+    ]
+    letters_asset_dir = letters_ctx.get("asset_dir")
+    letters_has_letters = bool(letters_ctx.get("has_letters"))
+    letters_missing_details = list(letters_ctx.get("missing", []))
+    if letters_mode == "image" and letters_missing_details:
+        _log_missing_letter_assets(letters_missing_details)
+
     if dry_run:
         return {
             "status": "dry-run",
@@ -1070,6 +1412,13 @@ def render_video_moviepy(
             "timer_visible": timer_visible,
             "timer_plan": timer_plan,
             "beep_schedule": beep_schedule,
+            "letters_mode": letters_mode,
+            "letters_assets": letters_assets,
+            "letters_missing": letters_missing_names,
+            "letters_layout": letters_layout,
+            "letters_asset_dir": letters_asset_dir,
+            "letters_has_letters": letters_has_letters,
+            "letters_missing_details": letters_missing_details,
         }
 
     # compute reveal clip size early so we can avoid placing the background
@@ -1514,14 +1863,54 @@ def render_video_moviepy(
             bg_error = str(e)
 
     # Letters (top-left) — move lower to avoid clipping
-    letters = item.get("letters", "")
-    if letters:
-        letters_y = 120  # increased from 80 to avoid top clipping
-        txt_letters = _make_text_imageclip(
-            text=letters, font_size=140, color=(0, 0, 0), duration=duration
-        )
-        txt_letters = txt_letters.with_position((64, letters_y))
-        clips.append(txt_letters)
+    letters_text = letters_ctx.get("letters", "")
+    if letters_has_letters:
+        if letters_mode == "image":
+            for entry in letters_plan_entries:
+                path = entry.get("path")
+                if not path or not os.path.isfile(path):
+                    detail = {
+                        "char": entry.get("char"),
+                        "filename": entry.get("filename"),
+                        "path": path,
+                        "reason": "missing",
+                    }
+                    if detail not in letters_missing_details:
+                        letters_missing_details.append(detail)
+                    name = entry.get("filename") or entry.get("char")
+                    if name and name not in letters_missing_names:
+                        letters_missing_names.append(name)
+                    continue
+                try:
+                    clip_letter = _mpy.ImageClip(path)
+                    target_height = entry.get("height")
+                    if target_height:
+                        clip_letter = clip_letter.resized(
+                            height=max(1, int(target_height)))
+                    clip_letter = clip_letter.with_duration(duration)
+                    clip_letter = clip_letter.with_position(
+                        (LETTER_SAFE_X + int(entry.get("x", 0)), LETTER_SAFE_Y)
+                    )
+                    clips.append(clip_letter)
+                except Exception as exc:
+                    detail = {
+                        "char": entry.get("char"),
+                        "filename": entry.get("filename"),
+                        "path": path,
+                        "reason": "load-error",
+                        "error": str(exc),
+                    }
+                    letters_missing_details.append(detail)
+                    name = entry.get("filename") or entry.get("char")
+                    if name and name not in letters_missing_names:
+                        letters_missing_names.append(name)
+        else:
+            txt_letters = _make_text_imageclip(
+                text=letters_text, font_size=140, color=(0, 0, 0), duration=duration
+            )
+            txt_letters = txt_letters.with_position(
+                (LETTER_SAFE_X, LETTER_SAFE_Y))
+            clips.append(txt_letters)
 
     # Chinese + zhuyin (top-right) — render per-character with vertical zhuyin
     word_zh = item.get("word_zh", "")

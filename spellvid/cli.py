@@ -14,6 +14,7 @@ def make(args: argparse.Namespace) -> int:
         "reveal_hold_sec": args.reveal_hold,
         "timer_visible": args.timer_visible,
         "progress_bar": args.progress_bar,
+        "letters_as_image": args.letters_as_image,
     }
     out = args.out
     res = utils.render_video_stub(
@@ -35,9 +36,25 @@ def batch(args: argparse.Namespace) -> int:
         return 2
     summary = {"ok": 0, "skipped": 0, "errors": []}
     for item in data:
+        if "letters_as_image" not in item:
+            item["letters_as_image"] = getattr(args, "letters_as_image", True)
         assets = utils.check_assets(item)
         if not assets["image_exists"]:
             print("WARNING: image missing for", item.get("word_en"))
+        if assets.get("letters_mode") == "image" and assets.get("letters_missing"):
+            details = assets.get("letters_missing_details") or []
+            if details:
+                for detail in details:
+                    name = detail.get("filename") or detail.get("char")
+                    path = detail.get("path")
+                    word = item.get("word_en")
+                    if path:
+                        print(f"WARNING: letters asset missing {name} at {path} for {word}")
+                    else:
+                        print(f"WARNING: letters asset missing {name} for {word}")
+            else:
+                for name in assets.get("letters_missing", []):
+                    print("WARNING: letters asset missing", name, "for", item.get("word_en"))
         out_path = os.path.join(args.outdir, f"{item['word_en']}.mp4")
         if "progress_bar" not in item:
             item["progress_bar"] = getattr(args, "progress_bar", True)
@@ -101,7 +118,19 @@ def build_parser():
         action="store_false",
         help="hide countdown timer overlay",
     )
-    p_make.set_defaults(progress_bar=True, timer_visible=True)
+    p_make.add_argument(
+        "--letters-as-image",
+        dest="letters_as_image",
+        action="store_true",
+        help="render top-left letters using image assets (default)",
+    )
+    p_make.add_argument(
+        "--no-letters-as-image",
+        dest="letters_as_image",
+        action="store_false",
+        help="render top-left letters using text fallback",
+    )
+    p_make.set_defaults(progress_bar=True, timer_visible=True, letters_as_image=True)
 
     p_make.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"
@@ -135,7 +164,19 @@ def build_parser():
         action="store_false",
         help="hide countdown timer overlay",
     )
-    p_batch.set_defaults(progress_bar=True, timer_visible=True)
+    p_batch.add_argument(
+        "--letters-as-image",
+        dest="letters_as_image",
+        action="store_true",
+        help="render top-left letters using image assets (default)",
+    )
+    p_batch.add_argument(
+        "--no-letters-as-image",
+        dest="letters_as_image",
+        action="store_false",
+        help="render top-left letters using text fallback",
+    )
+    p_batch.set_defaults(progress_bar=True, timer_visible=True, letters_as_image=True)
 
     p_batch.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"
