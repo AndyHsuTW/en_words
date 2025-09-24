@@ -12,6 +12,7 @@ def make(args: argparse.Namespace) -> int:
         "music_path": args.music,
         "countdown_sec": args.countdown,
         "reveal_hold_sec": args.reveal_hold,
+        "entry_hold_sec": args.entry_hold,
         "timer_visible": args.timer_visible,
         "progress_bar": args.progress_bar,
         "letters_as_image": args.letters_as_image,
@@ -60,6 +61,8 @@ def batch(args: argparse.Namespace) -> int:
             item["progress_bar"] = getattr(args, "progress_bar", True)
         if "timer_visible" not in item:
             item["timer_visible"] = getattr(args, "timer_visible", True)
+        if "entry_hold_sec" not in item:
+            item["entry_hold_sec"] = getattr(args, "entry_hold", 0.0)
 
         try:
             res = utils.render_video_stub(
@@ -91,6 +94,13 @@ def build_parser():
     p_make.add_argument("--countdown", type=int, dest="countdown", default=10)
     p_make.add_argument(
         "--reveal-hold", type=int, dest="reveal_hold", default=5
+    )
+    p_make.add_argument(
+        "--entry-hold",
+        type=float,
+        dest="entry_hold",
+        default=0.0,
+        help="seconds to hold after entry video before main timeline",
     )
     p_make.add_argument("--out", dest="out", default="out/output.mp4")
     p_make.add_argument("--dry-run", action="store_true", dest="dry_run")
@@ -140,6 +150,13 @@ def build_parser():
     p_batch.add_argument("--json")
     p_batch.add_argument("--outdir", default="out")
     p_batch.add_argument("--dry-run", action="store_true", dest="dry_run")
+    p_batch.add_argument(
+        "--entry-hold",
+        type=float,
+        dest="entry_hold",
+        default=0.0,
+        help="seconds to hold after entry video before main timeline",
+    )
     p_batch.add_argument(
         "--progress-bar",
         dest="progress_bar",

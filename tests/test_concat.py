@@ -3,6 +3,7 @@ import os
 import subprocess
 import shutil
 import sys
+from pathlib import Path
 
 
 def _find_ffprobe():
@@ -156,3 +157,80 @@ def test_concat_two_items(tmp_path):
     assert abs(merged_dur - expected) < 1.0, (
         f'expected merged duration ~{expected}s, got {merged_dur}s'
     )
+
+
+def test_concat_dry_run_skips_extra_entry(tmp_path):
+    """乾跑合併流程時僅允許第一段保留開頭影片。"""
+
+    root = Path(__file__).resolve().parents[1]
+    cfg = [
+        {
+            'letters': 'Aa',
+            'word_en': 'Arm',
+            'word_zh': '手臂',
+            'image_path': 'assets/arm.mp4',
+            'music_path': 'assets/arm_60s.mp3',
+            'countdown_sec': 2,
+            'reveal_hold_sec': 1,
+        },
+        {
+            'letters': 'Bb',
+            'word_en': 'Ball',
+            'word_zh': '球',
+            'image_path': 'assets/ball.mp4',
+            'music_path': 'assets/ball_60s.mp3',
+            'countdown_sec': 2,
+            'reveal_hold_sec': 1,
+        },
+    ]
+
+    cfg_path = tmp_path / 'cfg.json'
+    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False), encoding='utf-8')
+
+    out_dir = tmp_path / 'out'
+    out_dir.mkdir()
+
+    cmd = [
+        sys.executable,
+        str(root / 'scripts' / 'render_example.py'),
+        '--json',
+        str(cfg_path),
+        '--out-dir',
+        str(out_dir),
+        '--out-file',
+        'merged.mp4',
+        '--dry-run',
+    ]
+
+    proc = subprocess.run(
+        cmd,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=str(root),
+    )
+
+    lines = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+    results = None
+    for line in reversed(lines):
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, list):
+            results = payload
+            break
+
+    assert results is not None, f'無法從輸出擷取 dry-run 結果：\n{proc.stdout}'
+    assert len(results) == 2
+
+    first, second = results
+    assert first['entry_duration_sec'] > 0
+    assert first['entry_info'].get('exists', False) is True
+    assert first['entry_info'].get('enabled', True) is True
+
+    assert second['entry_duration_sec'] == 0
+    assert second['entry_offset_sec'] == 0
+    assert second['entry_info'].get('exists', True) is False
+    assert second['entry_info'].get('enabled', True) is False

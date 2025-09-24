@@ -67,6 +67,147 @@ _DEFAULT_LETTER_ASSET_DIR = os.path.abspath(
 )
 
 
+_DEFAULT_ENTRY_VIDEO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "assets", "entry.mp4")
+)
+
+
+def _coerce_non_negative_float(value: Any, default: float = 0.0) -> float:
+    try:
+        fv = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if fv < 0:
+        return 0.0
+    if not (fv < float("inf")):
+        return float(default)
+    return float(fv)
+
+
+def _resolve_entry_video_path(item: Dict[str, Any] | None = None) -> str:
+    if item:
+        override = item.get("entry_video_path") or item.get("entry_path")
+        if override:
+            return os.path.abspath(str(override))
+    env_override = os.environ.get("SPELLVID_ENTRY_VIDEO_PATH")
+    if env_override:
+        return os.path.abspath(env_override)
+    return _DEFAULT_ENTRY_VIDEO_PATH
+
+
+def _is_entry_enabled(item: Dict[str, Any] | None = None) -> bool:
+    if not item:
+        return True
+    if "entry_enabled" in item:
+        return _coerce_bool(item.get("entry_enabled"), True)
+    if "entry_disabled" in item:
+        return not _coerce_bool(item.get("entry_disabled"), False)
+    return True
+
+
+_entry_probe_cache: Dict[str, Tuple[float, Optional[float]]] = {}
+
+
+def _probe_media_duration(path: str) -> Optional[float]:
+    """Best-effort probe for a media file duration in seconds."""
+    if not path or not os.path.isfile(path):
+        return None
+
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+
+    cache_key = os.path.abspath(path)
+    cached = _entry_probe_cache.get(cache_key)
+    if cached and cached[0] == mtime:
+        return cached[1]
+
+    duration: Optional[float] = None
+
+    if _HAS_MOVIEPY:
+        try:
+            clip = _mpy.VideoFileClip(path)
+            try:
+                raw = getattr(clip, "duration", None)
+                if raw is not None:
+                    duration = float(raw)
+            finally:
+                try:
+                    clip.close()
+                except Exception:
+                    pass
+        except Exception:
+            duration = None
+
+    if duration is None:
+        candidates = [
+            shutil.which("ffprobe"),
+            shutil.which("ffprobe.exe"),
+            None,
+        ]
+        ffmpeg_dir = os.path.join(os.path.dirname(__file__), "..", "FFmpeg")
+        for exe in ("ffprobe", "ffprobe.exe"):
+            candidate = os.path.join(ffmpeg_dir, exe)
+            if os.path.isfile(candidate):
+                candidates.append(candidate)
+        for cand in candidates:
+            if not cand:
+                continue
+            cmd = [
+                cand,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                path,
+            ]
+            try:
+                out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                text = out.decode("utf-8", errors="ignore").strip()
+                if text:
+                    duration = float(text)
+                    break
+            except Exception:
+                continue
+
+    if duration is not None and duration < 0:
+        duration = None
+
+    _entry_probe_cache[cache_key] = (mtime, duration)
+    return duration
+
+
+def _prepare_entry_context(item: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    path = _resolve_entry_video_path(item)
+    enabled = _is_entry_enabled(item)
+    if not enabled:
+        return {
+            "path": path,
+            "exists": False,
+            "duration_sec": 0.0,
+            "hold_sec": 0.0,
+            "total_lead_sec": 0.0,
+            "enabled": False,
+        }
+    exists = os.path.isfile(path)
+    hold = _coerce_non_negative_float(
+        (item or {}).get("entry_hold_sec"), default=0.0
+    )
+    duration = _probe_media_duration(path) if exists else None
+    total_lead = (duration or 0.0) + hold
+    return {
+        "path": path,
+        "exists": bool(exists),
+        "duration_sec": duration,
+        "hold_sec": hold,
+        "total_lead_sec": total_lead,
+        "enabled": True,
+    }
+
+
 def _resolve_letter_asset_dir(item: Dict[str, Any] | None = None) -> str:
     override = None
     if item:
@@ -698,6 +839,11 @@ SCHEMA = {
             "music_path": {"type": "string"},
             "countdown_sec": {"type": "integer"},
             "reveal_hold_sec": {"type": "integer"},
+            "entry_hold_sec": {
+                "type": "number",
+                "minimum": 0,
+            },
+            "entry_enabled": {"type": "boolean", "default": True},
             "progress_bar": {"type": "boolean", "default": True},
             "timer_visible": {"type": "boolean", "default": True},
             "letters_as_image": {"type": "boolean", "default": True},
@@ -1245,18 +1391,48 @@ def render_video_stub(
     if letters_mode == "image" and letters_missing_details:
         _log_missing_letter_assets(letters_missing_details)
 
+    entry_ctx = _prepare_entry_context(item)
+    entry_offset = float(entry_ctx.get("total_lead_sec", 0.0))
+    entry_duration = float(entry_ctx.get("duration_sec") or 0.0)
+    entry_hold = float(entry_ctx.get("hold_sec", 0.0))
+    entry_offset_runtime = entry_offset
+    entry_duration_runtime = entry_duration
+
     countdown = int(item.get("countdown_sec", 10))
     reveal_hold = int(item.get("reveal_hold_sec", 5))
     word_en = item.get("word_en", "")
     n_for_timing = max(1, len(word_en))
     per = 1.0
     total_reveal_time = per * n_for_timing
-    duration = float(countdown + total_reveal_time + reveal_hold)
+    main_duration = float(countdown + total_reveal_time + reveal_hold)
+    total_duration_runtime = float(entry_offset_runtime + main_duration)
 
     progress_enabled = bool(item.get("progress_bar", True))
     progress_segments: List[Dict[str, Any]] = []
     if progress_enabled:
-        progress_segments = _build_progress_bar_segments(countdown, duration)
+        progress_segments = _build_progress_bar_segments(
+            countdown, main_duration)
+
+    progress_with_timeline: List[Dict[str, Any]] = []
+    for seg in progress_segments:
+        seg_copy = dict(seg)
+        try:
+            seg_copy["timeline_start"] = round(
+                entry_offset_runtime + float(seg_copy.get("start", 0.0)), 6
+            )
+        except Exception:
+            seg_copy["timeline_start"] = entry_offset_runtime
+        try:
+            seg_copy["timeline_end"] = round(
+                entry_offset_runtime + float(
+                    seg_copy.get("end", seg_copy.get("start", 0.0))
+                ),
+                6,
+            )
+        except Exception:
+            seg_copy["timeline_end"] = seg_copy["timeline_start"]
+        progress_with_timeline.append(seg_copy)
+    progress_segments = progress_with_timeline
 
     timer_visible = _coerce_bool(item.get("timer_visible", True))
     timer_plan: List[Dict[str, Any]] = []
@@ -1266,21 +1442,31 @@ def render_video_stub(
             mm = sec_left // 60
             ss = sec_left % 60
             timer_text = f"{mm:02d}:{ss:02d}"
-            timer_duration = float(duration - i) if i == countdown else 1.0
+            timer_duration = float(
+                main_duration - i) if i == countdown else 1.0
             if timer_duration < 0:
                 timer_duration = 0.0
-            timer_plan.append(
-                {
-                    "start": float(i),
-                    "text": timer_text,
-                    "duration": float(timer_duration),
-                }
+            entry = {
+                "start": float(i),
+                "text": timer_text,
+                "duration": float(timer_duration),
+            }
+            entry["timeline_start"] = round(
+                entry_offset_runtime + entry["start"], 6
             )
+            entry["timeline_end"] = round(
+                entry["timeline_start"] + entry["duration"], 6
+            )
+            timer_plan.append(entry)
 
     beep_schedule: List[float] = []
     for S in (3, 2, 1):
         if S <= countdown:
             beep_schedule.append(float(max(0.0, countdown - S)))
+
+    beep_schedule_timeline = [
+        round(entry_offset_runtime + t, 6) for t in beep_schedule
+    ]
 
     if dry_run:
         return {
@@ -1290,6 +1476,7 @@ def render_video_stub(
             "timer_visible": timer_visible,
             "timer_plan": timer_plan,
             "beep_schedule": beep_schedule,
+            "beep_schedule_timeline": beep_schedule_timeline,
             "letters_mode": letters_mode,
             "letters_assets": letters_assets,
             "letters_missing": letters_missing_names,
@@ -1300,6 +1487,11 @@ def render_video_stub(
             "letters_asset_dir": letters_asset_dir,
             "letters_has_letters": letters_has_letters,
             "letters_missing_details": letters_missing_details,
+            "entry_info": entry_ctx,
+            "entry_offset_sec": entry_offset_runtime,
+            "entry_duration_sec": entry_duration_runtime,
+            "entry_hold_sec": entry_hold,
+            "total_duration_sec": total_duration_runtime,
         }
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -1314,6 +1506,7 @@ def render_video_stub(
         "timer_visible": timer_visible,
         "timer_plan": timer_plan,
         "beep_schedule": beep_schedule,
+        "beep_schedule_timeline": beep_schedule_timeline,
         "letters_mode": letters_mode,
         "letters_assets": letters_assets,
         "letters_missing": letters_missing_names,
@@ -1321,6 +1514,11 @@ def render_video_stub(
         "letters_asset_dir": letters_asset_dir,
         "letters_has_letters": letters_has_letters,
         "letters_missing_details": letters_missing_details,
+        "entry_info": entry_ctx,
+        "entry_offset_sec": entry_offset_runtime,
+        "entry_duration_sec": entry_duration_runtime,
+        "entry_hold_sec": entry_hold,
+        "total_duration_sec": total_duration_runtime,
     }
 
 
@@ -1339,6 +1537,13 @@ def render_video_moviepy(
     if not _HAS_MOVIEPY:
         raise RuntimeError("MoviePy not available")
 
+    entry_ctx = _prepare_entry_context(item)
+    entry_offset = float(entry_ctx.get("total_lead_sec", 0.0))
+    entry_duration = float(entry_ctx.get("duration_sec") or 0.0)
+    entry_hold = float(entry_ctx.get("hold_sec", 0.0))
+    entry_offset_runtime = entry_offset
+    entry_duration_runtime = entry_duration
+
     countdown = int(item.get("countdown_sec", 10))
     # reveal_hold_sec is now the time to hold AFTER the reveal completes
     reveal_hold = int(item.get("reveal_hold_sec", 5))
@@ -1353,11 +1558,35 @@ def render_video_moviepy(
     # total video duration = countdown + time to reveal all letters
     # plus post-reveal hold
     duration = float(countdown + total_reveal_time + reveal_hold)
+    main_duration = duration
+    total_duration_runtime = float(entry_offset_runtime + main_duration)
 
     progress_enabled = bool(item.get("progress_bar", True))
     progress_segments: List[Dict[str, Any]] = []
     if progress_enabled:
-        progress_segments = _build_progress_bar_segments(countdown, duration)
+        progress_segments = _build_progress_bar_segments(
+            countdown, main_duration)
+
+    progress_with_timeline: List[Dict[str, Any]] = []
+    for seg in progress_segments:
+        seg_copy = dict(seg)
+        try:
+            seg_copy["timeline_start"] = round(
+                entry_offset_runtime + float(seg_copy.get("start", 0.0)), 6
+            )
+        except Exception:
+            seg_copy["timeline_start"] = entry_offset_runtime
+        try:
+            seg_copy["timeline_end"] = round(
+                entry_offset_runtime + float(
+                    seg_copy.get("end", seg_copy.get("start", 0.0))
+                ),
+                6,
+            )
+        except Exception:
+            seg_copy["timeline_end"] = seg_copy["timeline_start"]
+        progress_with_timeline.append(seg_copy)
+    progress_segments = progress_with_timeline
 
     timer_visible = _coerce_bool(item.get("timer_visible", True))
     timer_plan: List[Dict[str, Any]] = []
@@ -1367,21 +1596,31 @@ def render_video_moviepy(
             mm = sec_left // 60
             ss = sec_left % 60
             timer_text = f"{mm:02d}:{ss:02d}"
-            timer_duration = float(duration - i) if i == countdown else 1.0
+            timer_duration = float(
+                main_duration - i) if i == countdown else 1.0
             if timer_duration < 0:
                 timer_duration = 0.0
-            timer_plan.append(
-                {
-                    "start": float(i),
-                    "text": timer_text,
-                    "duration": float(timer_duration),
-                }
+            entry_timer = {
+                "start": float(i),
+                "text": timer_text,
+                "duration": float(timer_duration),
+            }
+            entry_timer["timeline_start"] = round(
+                entry_offset_runtime + entry_timer["start"], 6
             )
+            entry_timer["timeline_end"] = round(
+                entry_timer["timeline_start"] + entry_timer["duration"], 6
+            )
+            timer_plan.append(entry_timer)
 
     beep_schedule: List[float] = []
     for S in (3, 2, 1):
         if S <= countdown:
             beep_schedule.append(float(max(0.0, countdown - S)))
+
+    beep_schedule_timeline = [
+        round(entry_offset_runtime + t, 6) for t in beep_schedule
+    ]
 
     letters_ctx = _prepare_letters_context(item)
     letters_mode = letters_ctx.get("mode")
@@ -1412,6 +1651,7 @@ def render_video_moviepy(
             "timer_visible": timer_visible,
             "timer_plan": timer_plan,
             "beep_schedule": beep_schedule,
+            "beep_schedule_timeline": beep_schedule_timeline,
             "letters_mode": letters_mode,
             "letters_assets": letters_assets,
             "letters_missing": letters_missing_names,
@@ -1419,6 +1659,11 @@ def render_video_moviepy(
             "letters_asset_dir": letters_asset_dir,
             "letters_has_letters": letters_has_letters,
             "letters_missing_details": letters_missing_details,
+            "entry_info": entry_ctx,
+            "entry_offset_sec": entry_offset_runtime,
+            "entry_duration_sec": entry_duration_runtime,
+            "entry_hold_sec": entry_hold,
+            "total_duration_sec": total_duration_runtime,
         }
 
     # compute reveal clip size early so we can avoid placing the background
@@ -2361,8 +2606,8 @@ def render_video_moviepy(
             )
             clips.append(clip)
 
-    final = _mpy.CompositeVideoClip(clips, size=(1920, 1080))
-    final = final.with_duration(duration)
+    main_clip = _mpy.CompositeVideoClip(clips, size=(1920, 1080))
+    main_clip = main_clip.with_duration(duration)
 
     # Audio: optional music + beep in last 3 seconds
     audio_clips = []
@@ -2465,9 +2710,179 @@ def render_video_moviepy(
     if audio_clips:
         try:
             final_audio = _mpy.CompositeAudioClip(audio_clips)
-            final = final.with_audio(final_audio)
+            main_clip = main_clip.with_audio(final_audio)
         except Exception:
             pass
+
+    entry_loaded = False
+    entry_error = None
+    entry_clip_obj = None
+    hold_clip = None
+    cleanup_clips: List[Any] = []
+
+    def _ensure_dimensions(clip):
+        try:
+            size = getattr(clip, "size", None)
+            if size:
+                w, h = int(size[0]), int(size[1])
+                if (w, h) != (1920, 1080):
+                    try:
+                        clip = clip.resize(newsize=(1920, 1080))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return clip
+
+    if entry_ctx.get("exists"):
+        try:
+            entry_clip_obj = _mpy.VideoFileClip(entry_ctx["path"])
+            cleanup_clips.append(entry_clip_obj)
+            entry_clip_obj = _ensure_dimensions(entry_clip_obj)
+            entry_loaded = True
+            # If the primary entry clip lacks audio, try a fallback
+            # asset (entry_with_music.mp4) that ships with the repo so
+            # the composed output will include an audible entry intro.
+            try:
+                has_audio = getattr(entry_clip_obj, "audio", None) is not None
+                aud_dur = 0.0
+                if has_audio:
+                    try:
+                        aud_dur = float(
+                            getattr(
+                                entry_clip_obj.audio, "duration", 0.0
+                            )
+                            or 0.0
+                        )
+                    except Exception:
+                        aud_dur = 0.0
+                if not has_audio or aud_dur <= 0.001:
+                    # attempt to load fallback file from repo assets
+                    try:
+                        repo_root = os.path.abspath(
+                            os.path.join(os.path.dirname(__file__), "..")
+                        )
+                        fallback = os.path.join(
+                            repo_root, "assets", "entry_with_music.mp4"
+                        )
+                        if os.path.isfile(fallback):
+                            # close previous clip before replacing
+                            try:
+                                entry_clip_obj.close()
+                            except Exception:
+                                pass
+                            entry_clip_obj = _mpy.VideoFileClip(fallback)
+                            cleanup_clips.append(entry_clip_obj)
+                            entry_clip_obj = _ensure_dimensions(entry_clip_obj)
+                            entry_ctx["path"] = fallback
+                            entry_loaded = True
+                    except Exception:
+                        # ignore fallback failure and continue with primary
+                        pass
+            except Exception:
+                # non-fatal: don't block rendering if audio introspection fails
+                pass
+            try:
+                probed = getattr(entry_clip_obj, "duration", None)
+                if probed is not None and probed > 0:
+                    entry_duration_runtime = float(probed)
+                    entry_offset_runtime = entry_duration_runtime + entry_hold
+                    total_duration_runtime = (
+                        entry_offset_runtime + main_duration
+                    )
+            except Exception:
+                pass
+        except Exception as exc:
+            entry_clip_obj = None
+            entry_loaded = False
+            try:
+                entry_error = str(exc)
+            except Exception:
+                entry_error = "failed to load entry clip"
+
+    if entry_hold > 0:
+        try:
+            if entry_clip_obj is not None:
+                last_t = float(
+                    max(0.0, (entry_clip_obj.duration or 0.0) - 0.04)
+                )
+                try:
+                    hold_source = entry_clip_obj.to_ImageClip(t=last_t)
+                except Exception:
+                    frame = entry_clip_obj.get_frame(last_t)
+                    hold_source = _mpy.ImageClip(frame)
+                hold_clip = hold_source.with_duration(entry_hold)
+                hold_clip = _ensure_dimensions(hold_clip)
+            else:
+                hold_clip = _mpy.ColorClip(
+                    size=(1920, 1080), color=(0, 0, 0)
+                ).with_duration(entry_hold)
+            cleanup_clips.append(hold_clip)
+        except Exception as exc:
+            hold_clip = None
+            if entry_error is None:
+                try:
+                    entry_error = f"entry hold failed: {exc}"
+                except Exception:
+                    entry_error = "entry hold failed"
+
+    concat_clips = []
+    if entry_clip_obj is not None:
+        concat_clips.append(entry_clip_obj)
+        if hold_clip is not None and hold_clip is not entry_clip_obj:
+            concat_clips.append(hold_clip)
+    elif hold_clip is not None:
+        concat_clips.append(hold_clip)
+    concat_clips.append(main_clip)
+
+    if len(concat_clips) == 1:
+        final_clip = main_clip
+    else:
+        try:
+            final_clip = _mpy.concatenate_videoclips(
+                concat_clips, method="compose"
+            )
+        except Exception:
+            final_clip = _mpy.concatenate_videoclips(concat_clips)
+
+    final_duration = (
+        float(
+            getattr(final_clip, "duration", total_duration_runtime)
+            or total_duration_runtime
+        )
+        if final_clip is not None
+        else total_duration_runtime
+    )
+    total_duration_runtime = final_duration
+
+    try:
+        for seg in progress_segments:
+            rel_start = float(seg.get("start", 0.0))
+            rel_end = float(seg.get("end", seg.get("start", 0.0)))
+            seg["timeline_start"] = round(
+                entry_offset_runtime + rel_start, 6
+            )
+            seg["timeline_end"] = round(
+                entry_offset_runtime + rel_end, 6
+            )
+    except Exception:
+        pass
+
+    try:
+        for tp in timer_plan:
+            rel_start = float(tp.get("start", 0.0))
+            tp["timeline_start"] = round(
+                entry_offset_runtime + rel_start, 6
+            )
+            tp["timeline_end"] = round(
+                tp["timeline_start"] + float(tp.get("duration", 0.0)), 6
+            )
+    except Exception:
+        pass
+
+    beep_schedule_timeline = [
+        round(entry_offset_runtime + t, 6) for t in beep_schedule
+    ]
 
     # ensure out dir
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -2485,15 +2900,20 @@ def render_video_moviepy(
                 snapshot_dir, f'final_snapshot-{int(_time.time())}.png'
             )
             try:
-                final.save_frame(snapshot_path, t=0)
+                final_clip.save_frame(snapshot_path, t=0)
                 print(f'Wrote final composite snapshot: {snapshot_path}')
             except Exception as _e:
                 print('Failed to write final snapshot:', _e)
         finally:
             try:
-                final.close()
+                final_clip.close()
             except Exception:
                 pass
+            for extra in cleanup_clips:
+                try:
+                    extra.close()
+                except Exception:
+                    pass
         return {
             "status": "debug-snapshot",
             "snapshot": snapshot_path,
@@ -2507,6 +2927,18 @@ def render_video_moviepy(
             "timer_visible": timer_visible,
             "timer_plan": timer_plan,
             "beep_schedule": beep_schedule,
+            "beep_schedule_timeline": beep_schedule_timeline,
+            "entry_info": {
+                **entry_ctx,
+                "loaded": entry_loaded,
+                "error": entry_error,
+                "duration_sec": entry_duration_runtime,
+                "total_lead_sec": entry_offset_runtime,
+            },
+            "entry_offset_sec": entry_offset_runtime,
+            "entry_duration_sec": entry_duration_runtime,
+            "entry_hold_sec": entry_hold,
+            "total_duration_sec": total_duration_runtime,
         }
 
     # write the file
@@ -2515,7 +2947,7 @@ def render_video_moviepy(
         # write with explicit codecs
         ffmpeg_exe = os.environ.get("IMAGEIO_FFMPEG_EXE")
         if ffmpeg_exe:
-            final.write_videofile(
+            final_clip.write_videofile(
                 out_path,
                 fps=30,
                 codec="libx264",
@@ -2525,13 +2957,26 @@ def render_video_moviepy(
             )
         else:
             # fallback: simple call
-            final.write_videofile(out_path, fps=30)
+            final_clip.write_videofile(out_path, fps=30)
     finally:
         # close resources
         try:
-            final.close()
+            final_clip.close()
         except Exception:
             pass
+        for extra in cleanup_clips:
+            try:
+                extra.close()
+            except Exception:
+                pass
+
+    entry_runtime = {
+        **entry_ctx,
+        "loaded": entry_loaded,
+        "error": entry_error,
+        "duration_sec": entry_duration_runtime,
+        "total_lead_sec": entry_offset_runtime,
+    }
 
     return {
         "status": "ok",
@@ -2545,4 +2990,10 @@ def render_video_moviepy(
         "timer_visible": timer_visible,
         "timer_plan": timer_plan,
         "beep_schedule": beep_schedule,
+        "beep_schedule_timeline": beep_schedule_timeline,
+        "entry_info": entry_runtime,
+        "entry_offset_sec": entry_offset_runtime,
+        "entry_duration_sec": entry_duration_runtime,
+        "entry_hold_sec": entry_hold,
+        "total_duration_sec": total_duration_runtime,
     }

@@ -173,6 +173,8 @@ if args.json_path and os.path.isfile(args.json_path):
             name = item.get('word_en') or item.get('letters') or f'out_{idx}'
             if timer_override is not None:
                 item['timer_visible'] = bool(timer_override)
+            if final_out and len(cfg) > 1 and 'entry_enabled' not in item:
+                item['entry_enabled'] = (idx == 0)
             # default filename from config
             fname = sanitize_name(name) + '.mp4'
             outp = os.path.join(args.out_dir, fname)

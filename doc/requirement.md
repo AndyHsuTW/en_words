@@ -96,6 +96,7 @@
 | FR-EXPORT-1 | 本系統應以 **H.264（yuv420p, CRF 18–23）+ AAC** 匯出 MP4。 | Must |
 | FR-EXPORT-2 | 本系統應以 `{word_en}.mp4` 命名並輸出至 `./out`（可變更）。       | Must |
 | FR-EXPORT-3 | 本系統應於影片末端加入 **1 秒** 淡出。                          | Must |
+| FR-EXPORT-4 | 本系統應於每支輸出影片前固定加入開頭影片，檔案路徑為 `assets\\entry.mp4`；且應允許設定開頭影片播放完畢後在切換至主內容前的停留時間（秒數，可為 0）。 | Must |
 
 ### 5. CLI 與操作
 
@@ -157,6 +158,8 @@ Scenario: 批次生成（batch）
   Given 準備 JSON 陣列檔 data/words.json（見下方 Schema 與範例）
   When 執行  spellvid batch --json data/words.json --outdir out --beep true
   Then 為 JSON 中每個物件輸出一支 MP4，檔名為 {word_en}.mp4
+   And 每支輸出影片的開頭都應先播放 `assets\\entry.mp4`
+   And 若設定了 `entry_hold_sec`（或以 CLI 旗標 `--entry-hold` 傳入），應在開頭影片播放完畢後停留相應秒數才切換到主內容
    And 若 image_path 缺檔則以白色底圖替代並於日誌記錄
    And 程序完成後輸出成功/失敗總結
 ```
@@ -249,6 +252,7 @@ Scenario: 批次生成（batch）
       "music_path": {"type": "string", "description": "專屬 MP3 音樂，不循環"},
       "countdown_sec": {"type": "integer", "default": 10, "minimum": 1},
       "reveal_hold_sec": {"type": "integer", "default": 5, "minimum": 1},
+      "entry_hold_sec": {"type": "integer", "default": 0, "minimum": 0, "description": "開頭影片播放完畢後停留幾秒再切換至主內容（可為 0）"},
       "theme": {"type": "string", "enum": ["default"], "default": "default"}
     },
     "additionalProperties": false
@@ -268,6 +272,7 @@ Scenario: 批次生成（batch）
     "music_path": "assets/ice.mp3",
     "countdown_sec": 10,
     "reveal_hold_sec": 5,
+    "entry_hold_sec": 1,
     "theme": "default"
   }
 ]
@@ -285,13 +290,14 @@ spellvid make \
   --music assets/ice.mp3 \
   --countdown 10 \
   --reveal-hold 5 \
+  --entry-hold 1 \
   --size 1920x1080 \
   --fps 30 \
   --beep true \
   --out out/Ice.mp4
 
 # 批次
-spellvid batch --json data/words.json --outdir out --beep true --dry-run false
+spellvid batch --json data/words.json --outdir out --beep true --dry-run false --entry-hold 1
 ```
 
 # 🎨 版面配置（Default Theme: 1920×1080）

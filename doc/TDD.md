@@ -46,6 +46,7 @@
 
 - `data/words.json`：至少 3 筆（完整 / 缺資產（image/video 缺失） / 音樂短於影片）。
 - 視覺資產（圖片或影片）：`assets/ice.png`、`assets/empty.png`（全白 1920×1080）、`assets/sample.mp4`（短片範例）。
+- 開頭影片（固定加入）：`assets/entry.mp4`（作為每支輸出影片的開頭片段）。
 - 音樂：`tests/assets/ball.mp3`。
 - 嗶聲：動態生成（1kHz 正弦波, 300ms, 0.2 音量, 44100Hz 採樣率, 立體聲）。
 
@@ -73,6 +74,10 @@
 | TCS-PROG-005     | Integration | FR-UI     | 圓角樣式與抗鋸齒驗證                 | 進度條邊緣應為圓角（預設半徑 8 px）；在取樣邊緣時應觀察到平滑無明顯鋸齒（使用 OpenCV 邊緣檢測與中位色檢查）。 |
 | TCS-FALLBACK-001 | Integration | FR-INPUT  | 缺 `image_path` 或視覺資產不是存在的圖片/影片 | 以白底圖合成；畫面取樣接近 #FFFFFF        |
 | TCS-EXPORT-001   | Integration | FR-EXPORT | ffprobe 檢查                     | h264 / yuv420p / 30fps / aac |
+| TCS-ENTRY-001    | Integration | FR-EXPORT | 開頭影片合成                      | 每支輸出檔案的起始段應為 `assets/entry.mp4` 的內容（可由 ffprobe/畫面取樣驗證），且檔案總長應 ≥ entry.mp4 長度。
+| TCS-ENTRY-002    | Integration | FR-EXPORT | 開頭影片停留時長                    | 當 JSON 或 CLI 指定 `entry_hold_sec`（或 `--entry-hold`）時，輸出影片在開頭影片播放完畢後應保留指定秒數的停留（可檢查時間戳或持續最後一幀的重複）。
+| TCS-ENTRY-003    | Integration | FR-EXPORT / FR-CLI | 多單字合併輸出（--out-file）          | 僅第一段保留開頭影片，後續段落 entry_duration_sec=0；可透過 `scripts/render_example.py --out-file ... --dry-run` 的 JSON 輸出驗證。
+| TCS-CLI-ENTRY-001| Unit/Integration | FR-CLI  | CLI 旗標驗證                        | `--entry-hold` 在 `--dry-run` 模式下應被接受並列印解析後的值；在正常執行時會影響輸出行為。 |
 | TCS-EXPORT-002   | Integration | FR-EXPORT | word\_en=Ice                   | 檔名 `Ice.mp4` 於 `out/`        |
 | TCS-EXPORT-003   | Integration | FR-EXPORT | 片尾                             | 最末 1s 亮度趨降（淡出）               |
 | TCS-LOG-001      | Integration | FR-OPS    | 缺圖/缺音                          | 流程不中斷；日誌 WARNING             |
@@ -100,6 +105,8 @@ Feature: 批次輸出英語學習短片
   Scenario: 成功批次輸出（含缺圖回退）
     When I run "spellvid batch --json data/words.json --outdir out --beep true"
     Then for each valid item an MP4 named "{word_en}.mp4" is generated under out/
+  And each output MP4 must begin with the contents of `assets\\entry.mp4`
+  And if `entry_hold_sec` is specified (or `--entry-hold` passed), the output should include the configured hold duration immediately after the entry video finishes
   And items with missing image or video use a white background fallback
      And the process prints a summary with counts of succeeded and skipped items
 
@@ -108,6 +115,15 @@ Feature: 批次輸出英語學習短片
     Then no MP4 files are created
      And a list of missing assets is printed
      And the exit code is 0
+
+  Scenario: 多單字合併輸出只保留一次開頭影片
+    Given data/words.json 含有至少兩筆有效項目
+    When I run "python scripts/render_example.py --json data/words.json --out-dir out --out-file merged.mp4 --dry-run"
+    Then dry-run 輸出中的第一筆結果 `entry_duration_sec` 大於 0
+    And 第二筆結果 `entry_duration_sec` 等於 0
+    And 日誌顯示將合併暫存檔案成單一輸出
+
+
 ```
 
 ---
