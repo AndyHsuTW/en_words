@@ -889,7 +889,12 @@ def validate_schema(data: Any) -> List[str]:
 _ZHUYIN_MAP = {
     "冰": "ㄅㄧㄥ",
     "塊": "ㄎㄨㄞˋ",
+    "動": "ㄉㄨㄥˋ",
+    "物": "ㄨˋ",
 }
+
+ZHUYIN_BASE_HEIGHT_RATIO = 0.65
+ZHUYIN_MIN_FONT_SIZE = 10
 
 
 def zhuyin_for(text: str) -> str:
@@ -2235,10 +2240,11 @@ def render_video_moviepy(
 
                 # choose a smaller zh font and iteratively reduce size until
                 # stacked main symbols fit within the CJK glyph height.
-                n_main = max(
-                    1, (len(main_syms) if main_syms else len(lines)) or 1
+                target_base = max(
+                    ZHUYIN_MIN_FONT_SIZE,
+                    int(ch_h * ZHUYIN_BASE_HEIGHT_RATIO),
                 )
-                zh_font_size = max(10, int(ch_h / n_main))
+                zh_font_size = min(target_base, int(ch_h))
                 zh_w = 0
                 total_main_h = 0
                 try:
@@ -2264,7 +2270,7 @@ def render_video_moviepy(
                                 tone_syms[0], zh_font
                             )
 
-                        if total_main_h <= ch_h or zh_font_size <= 10:
+                        if total_main_h <= ch_h or zh_font_size <= ZHUYIN_MIN_FONT_SIZE:
                             break
                         zh_font_size -= 1
                 except Exception:
