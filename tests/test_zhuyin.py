@@ -79,3 +79,64 @@ def test_single_symbol_zhuyin_font_is_capped():
     assert zh_size < ch_h
     assert zh_size <= int(ch_h * utils.ZHUYIN_BASE_HEIGHT_RATIO)
     assert zh_size >= utils.ZHUYIN_MIN_FONT_SIZE
+
+
+def test_zhuyin_neutral_tone_offsets():
+    """確認輕聲點會被排在主符號上方並對齊中央。"""
+    cursor_y = 10
+    col_h = 200
+    total_main_h = 120
+    tone_syms = ["˙"]
+    tone_sizes = [(18, 18)]
+    layout = utils._layout_zhuyin_column(
+        cursor_y=cursor_y,
+        col_h=col_h,
+        total_main_h=total_main_h,
+        tone_syms=tone_syms,
+        tone_sizes=tone_sizes,
+    )
+    assert layout["tone_alignment"] == "center"
+    assert layout["tone_start_y"] is not None
+    assert layout["tone_box_height"] == tone_sizes[0][1]
+    # tone_start_y + tone_height + 預設間距 (2px) 應該等於 main_start_y
+    expected_gap = tone_sizes[0][1] + 2
+    assert layout["main_start_y"] == layout["tone_start_y"] + expected_gap
+    assert layout["main_start_y"] > layout["tone_start_y"]
+
+
+
+
+def test_zhuyin_main_symbols_align_with_character_top():
+    """確認注音主體與中文字頂端對齊。"""
+    cursor_y = 12
+    col_h = 140
+    total_main_h = 100
+    layout = utils._layout_zhuyin_column(
+        cursor_y=cursor_y,
+        col_h=col_h,
+        total_main_h=total_main_h,
+        tone_syms=[],
+        tone_sizes=[],
+    )
+    assert layout["main_start_y"] == cursor_y
+    assert layout["main_start_y"] + total_main_h <= cursor_y + col_h
+
+def test_zhuyin_non_neutral_tone_remains_side_aligned():
+    """確認遇到一般聲調時，注音主符仍貼著中文字右側排列，聲調從主符中段向外延伸。"""
+    cursor_y = 8
+    col_h = 180
+    total_main_h = 100
+    tone_syms = ["ˊ"]
+    tone_sizes = [(16, 20)]
+    layout = utils._layout_zhuyin_column(
+        cursor_y=cursor_y,
+        col_h=col_h,
+        total_main_h=total_main_h,
+        tone_syms=tone_syms,
+        tone_sizes=tone_sizes,
+    )
+    assert layout["tone_alignment"] == "right"
+    assert layout["main_start_y"] == cursor_y
+    assert layout["main_start_y"] + total_main_h <= cursor_y + col_h
+    assert layout["tone_start_y"] == cursor_y + total_main_h // 2
+    assert layout["tone_box_height"] == tone_sizes[0][1]

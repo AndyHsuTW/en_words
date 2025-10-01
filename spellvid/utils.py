@@ -931,6 +931,67 @@ def zhuyin_for(text: str) -> str:
         return " ".join([p for p in parts if p])
 
 
+def _layout_zhuyin_column(
+    cursor_y: int,
+    col_h: int,
+    total_main_h: int,
+    tone_syms: List[str],
+    tone_sizes: List[Tuple[int, int]],
+    tone_gap: int = 10,
+) -> Dict[str, Any]:
+    """Compute vertical offsets for bopomofo main symbols and tone marks."""
+    tone_is_neutral = len(tone_syms) == 1 and tone_syms[0] == "˙"
+    top = int(cursor_y)
+    col_height = max(0, int(col_h))
+    safe_total_main_h = max(0, int(total_main_h))
+
+    base_main_start_y = top
+    if safe_total_main_h > 0:
+        limit_main_start = top + col_height - safe_total_main_h
+        if limit_main_start < base_main_start_y:
+            base_main_start_y = limit_main_start
+    layout: Dict[str, Any] = {
+        "main_start_y": base_main_start_y,
+        "tone_start_y": None,
+        "tone_box_height": 0,
+        "tone_alignment": "right",
+        "tone_is_neutral": tone_is_neutral,
+    }
+    if not tone_syms or not tone_sizes:
+        return layout
+
+    tone_total_h = 0
+    for idx, (_, height) in enumerate(tone_sizes):
+        tone_total_h += max(0, int(height))
+        if idx < len(tone_sizes) - 1:
+            tone_total_h += tone_gap
+    tone_total_h = max(0, tone_total_h)
+
+    if tone_is_neutral:
+        gap_to_main = tone_gap if safe_total_main_h > 0 and tone_total_h > 0 else 0
+        block_h = safe_total_main_h + tone_total_h + gap_to_main
+        block_start_y = top
+        if block_h > 0:
+            limit_block_start = top + col_height - block_h
+            if limit_block_start < block_start_y:
+                block_start_y = limit_block_start
+        layout["tone_start_y"] = block_start_y
+        layout["main_start_y"] = block_start_y + tone_total_h + gap_to_main
+        layout["tone_box_height"] = tone_total_h
+        layout["tone_alignment"] = "center"
+    else:
+        layout["main_start_y"] = base_main_start_y
+        tone_start_y = base_main_start_y + max(0, safe_total_main_h // 2)
+        if tone_total_h > 0:
+            max_tone_start = top + col_height - tone_total_h
+            if tone_start_y > max_tone_start:
+                tone_start_y = max_tone_start
+        layout["tone_start_y"] = tone_start_y
+        layout["tone_box_height"] = tone_total_h or safe_total_main_h
+
+    return layout
+
+
 def compute_layout_bboxes(
     item: Dict[str, Any], video_size=(1920, 1080)
 ) -> Dict[str, Dict[str, int]]:
@@ -2247,6 +2308,8 @@ def render_video_moviepy(
                 zh_font_size = min(target_base, int(ch_h))
                 zh_w = 0
                 total_main_h = 0
+                tone_dims: List[Tuple[int, int]] = []
+                tone_max_w = 0
                 try:
                     while True:
                         try:
@@ -2265,17 +2328,29 @@ def render_video_moviepy(
                             zh_w = max(zh_w, sw)
                             total_main_h += sh + 2
 
-                        if tone_syms:
-                            tw, th = _measure_text_with_pil(
-                                tone_syms[0], zh_font
-                            )
-
                         if total_main_h <= ch_h or zh_font_size <= ZHUYIN_MIN_FONT_SIZE:
                             break
                         zh_font_size -= 1
                 except Exception:
                     zh_w = zh_w or 0
                     total_main_h = total_main_h or 0
+
+                if tone_syms:
+                    tone_dims = []
+                    tone_max_w = 0
+                    for ts in tone_syms:
+                        tw, th = _measure_text_with_pil(ts, zh_font)
+                        tone_dims.append((tw, th))
+                        tone_max_w = max(tone_max_w, tw)
+
+                tone_layout = _layout_zhuyin_column(
+                    cursor_y=cursor_y,
+                    col_h=col_h,
+                    total_main_h=total_main_h,
+                    tone_syms=tone_syms,
+                    tone_sizes=tone_dims,
+                    tone_gap=10,
+                )
 
                 # x position for bopomofo (immediately to the right)
                 zh_x = cursor_x + ch_w + 2
@@ -2284,56 +2359,56 @@ def render_video_moviepy(
                 col_h = ch_h
 
                 # draw main symbols stacked vertically
-                # compute vertical start (center within col_h)
-                main_start_y = cursor_y + max(0, (col_h - total_main_h) // 2)
+                main_start_y = tone_layout["main_start_y"]
                 cur_y = main_start_y
                 for sym in main_syms if main_syms else lines:
                     draw.text((zh_x, cur_y), sym, font=zh_font, fill=(0, 0, 0))
                     sw, sh = _measure_text_with_pil(sym, zh_font)
                     cur_y += sh + 2
 
-                # draw tone marks (if any) centered on the main stacked
-                # bopomofo block's vertical midpoint and moved closer to it.
-                if tone_syms:
-                    # compute total tone height and max width
-                    tone_total_h = 0
-                    tone_max_w = 0
-                    for ts in tone_syms:
-                        tw, th = _measure_text_with_pil(ts, zh_font)
-                        tone_total_h += th + 2
-                        tone_max_w = max(tone_max_w, tw)
-                    # remove last added spacing
-                    if tone_total_h > 0:
-                        tone_total_h -= 2
+                # draw tone marks (if any). Neutral tone (˙) is centered above the main block.
+                tone_box = None
+                tone_start_y = tone_layout.get("tone_start_y")
+                tone_box_height = tone_layout.get("tone_box_height", 0)
+                tone_alignment = tone_layout.get("tone_alignment", "right")
 
-                    # align tone block height to main stacked bopomofo height
-                    tone_total_h = int(total_main_h)
-                    # place tone box top Y at zh_top + (zh_height/2)
-                    tone_start_y = int(main_start_y + (total_main_h // 2))
-                    # place tone touching bopomofo, then shift left 2px
-                    # (small visual nudge to sit closer to bopomofo)
-                    tone_x = zh_x + int(zh_w) - 2
-                    # draw tones
+                if tone_syms and tone_start_y is not None:
+                    if tone_alignment == "center":
+                        tone_w = tone_dims[0][0] if tone_dims else 0
+                        tone_x = zh_x + max(0, (int(zh_w) - tone_w) // 2)
+                    else:
+                        # place tone touching bopomofo, then shift left 2px
+                        # (small visual nudge to sit closer to bopomofo)
+                        tone_x = zh_x + int(zh_w) - 2
                     tcur = tone_start_y
-                    for ts in tone_syms:
-                        draw.text(
-                            (tone_x, tcur), ts, font=zh_font, fill=(0, 0, 0)
-                        )
-                        tw, th = _measure_text_with_pil(ts, zh_font)
+                    for idx, ts in enumerate(tone_syms):
+                        if idx < len(tone_dims):
+                            tw, th = tone_dims[idx]
+                        else:
+                            tw, th = _measure_text_with_pil(ts, zh_font)
+                        draw.text((tone_x, tcur), ts,
+                                  font=zh_font, fill=(0, 0, 0))
                         tcur += th + 2
-                    # record tone box for overlay
-                    # Use half of the measured max width for the tone box.
-                    # Some bopomofo glyphs render with extra side-bearing.
-                    # Using half the measured width yields a tighter box
-                    # closer to the visual glyph extent while still
-                    # guarding against 0.
-                    half_tone_w = max(1, int(tone_max_w / 2))
-                    tone_box = (
-                        tone_x,
-                        tone_start_y,
-                        tone_x + half_tone_w,
-                        tone_start_y + int(tone_total_h),
-                    )
+
+                    if tone_alignment == "center":
+                        tone_w = tone_dims[0][0] if tone_dims else 0
+                        tone_h = tone_box_height or (
+                            tone_dims[0][1] if tone_dims else 0)
+                        tone_box = (
+                            tone_x,
+                            tone_start_y,
+                            tone_x + max(1, int(tone_w)),
+                            tone_start_y + max(1, int(tone_h)),
+                        )
+                    else:
+                        half_tone_w = max(1, int(tone_max_w / 2))
+                        tone_box = (
+                            tone_x,
+                            tone_start_y,
+                            tone_x + half_tone_w,
+                            tone_start_y +
+                            int(tone_box_height or total_main_h),
+                        )
 
                 # record overlay boxes for debugging
                 overlay_boxes.append(
