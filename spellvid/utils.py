@@ -71,6 +71,10 @@ _DEFAULT_ENTRY_VIDEO_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "assets", "entry.mp4")
 )
 
+# Main background color for render_video_moviepy (RGB tuple).
+# Change this constant to control the default full-screen background color.
+MAIN_BG_COLOR = (255, 250, 233)
+
 
 def _coerce_non_negative_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -896,6 +900,18 @@ _ZHUYIN_MAP = {
 ZHUYIN_BASE_HEIGHT_RATIO = 0.65
 ZHUYIN_MIN_FONT_SIZE = 10
 
+ZHUYIN_GAP_FOR_TWO = 12
+ZHUYIN_GAP_FOR_THREE = 8
+
+
+def _zhuyin_main_gap(symbol_count: int) -> int:
+    """Return vertical gap (px) between stacked zhuyin symbols."""
+    if symbol_count <= 1:
+        return 0
+    if symbol_count == 2:
+        return ZHUYIN_GAP_FOR_TWO
+    return ZHUYIN_GAP_FOR_THREE
+
 
 def zhuyin_for(text: str) -> str:
     """Return a naive zhuyin by joining per-character lookup.
@@ -1100,7 +1116,10 @@ def compute_layout_bboxes(
                     1, (len(main_syms) if main_syms else len(lines)) or 1
                 )
                 # start with an estimate of zh size and shrink if necessary
-                zh_font_size = max(10, int(ch_h / n_main))
+                zh_font_size = max(ZHUYIN_MIN_FONT_SIZE, int(ch_h / n_main))
+                symbols = main_syms if main_syms else lines
+                symbol_count = len(symbols)
+                gap = _zhuyin_main_gap(symbol_count)
                 zh_w = 0
                 zh_h = 0
                 # tone_h not needed in render path
@@ -1117,16 +1136,18 @@ def compute_layout_bboxes(
 
                         zh_w = 0
                         zh_h = 0
-                        for sym in main_syms if main_syms else lines:
+                        for idx_sym, sym in enumerate(symbols):
                             sw, sh = measure_text(sym, zh_font)
                             zh_w = max(zh_w, sw)
-                            zh_h += sh + 2
+                            zh_h += sh
+                            if idx_sym < symbol_count - 1:
+                                zh_h += gap
 
                         if tone_syms:
                             tw, th = measure_text(tone_syms[0], zh_font)
 
                         # stop when fit or reached min size
-                        if zh_h <= ch_h or zh_font_size <= 10:
+                        if zh_h <= ch_h or zh_font_size <= ZHUYIN_MIN_FONT_SIZE:
                             break
                         zh_font_size -= 1
 
@@ -1769,7 +1790,7 @@ def render_video_moviepy(
 
     # prepare background: always use a white full-screen ColorClip
     bg = (
-        _mpy.ColorClip(size=(1920, 1080), color=(255, 255, 255))
+        _mpy.ColorClip(size=(1920, 1080), color=MAIN_BG_COLOR)
         .with_duration(duration)
     )
     clips = [bg]
@@ -2262,12 +2283,16 @@ def render_video_moviepy(
                 ch_w, ch_h = _measure_text_with_pil(ch, pil_font)
                 zh_grp = zh_groups[i] if i < len(zh_groups) else ""
                 zh_lines = list(zh_grp) if zh_grp else []
+                symbol_count = len(zh_lines)
+                gap = _zhuyin_main_gap(symbol_count)
                 zh_w = 0
                 zh_h = 0
-                for sym in zh_lines:
+                for idx_sym, sym in enumerate(zh_lines):
                     sw, sh = _measure_text_with_pil(sym, pil_font)
                     zh_w = max(zh_w, sw)
-                    zh_h += sh + 2
+                    zh_h += sh
+                    if idx_sym < symbol_count - 1:
+                        zh_h += gap
 
                 col_w = ch_w + (zh_w if zh_w else 0) + padding
                 col_h = max(ch_h, zh_h)
@@ -2310,6 +2335,9 @@ def render_video_moviepy(
                 total_main_h = 0
                 tone_dims: List[Tuple[int, int]] = []
                 tone_max_w = 0
+                symbols = main_syms if main_syms else lines
+                symbol_count = len(symbols)
+                main_gap = _zhuyin_main_gap(symbol_count)
                 try:
                     while True:
                         try:
@@ -2323,10 +2351,12 @@ def render_video_moviepy(
 
                         zh_w = 0
                         total_main_h = 0
-                        for sym in main_syms if main_syms else lines:
+                        for idx_sym, sym in enumerate(symbols):
                             sw, sh = _measure_text_with_pil(sym, zh_font)
                             zh_w = max(zh_w, sw)
-                            total_main_h += sh + 2
+                            total_main_h += sh
+                            if idx_sym < symbol_count - 1:
+                                total_main_h += main_gap
 
                         if total_main_h <= ch_h or zh_font_size <= ZHUYIN_MIN_FONT_SIZE:
                             break
@@ -2358,13 +2388,19 @@ def render_video_moviepy(
                 # exceed the red bbox
                 col_h = ch_h
 
+                symbols = main_syms if main_syms else lines
+                symbol_count = len(symbols)
+                main_gap = _zhuyin_main_gap(symbol_count)
+
                 # draw main symbols stacked vertically
                 main_start_y = tone_layout["main_start_y"]
                 cur_y = main_start_y
-                for sym in main_syms if main_syms else lines:
+                for idx_sym, sym in enumerate(symbols):
                     draw.text((zh_x, cur_y), sym, font=zh_font, fill=(0, 0, 0))
                     sw, sh = _measure_text_with_pil(sym, zh_font)
-                    cur_y += sh + 2
+                    cur_y += sh
+                    if idx_sym < symbol_count - 1:
+                        cur_y += main_gap
 
                 # draw tone marks (if any). Neutral tone (˙) is centered above the main block.
                 tone_box = None
