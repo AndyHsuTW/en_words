@@ -80,6 +80,7 @@
 | TCS-CLI-ENTRY-001| Unit/Integration | FR-CLI  | CLI 旗標驗證                        | `--entry-hold` 在 `--dry-run` 模式下應被接受並列印解析後的值；在正常執行時會影響輸出行為。 |
 | TCS-EXPORT-002   | Integration | FR-EXPORT | word\_en=Ice                   | 檔名 `Ice.mp4` 於 `out/`        |
 | TCS-EXPORT-003   | Integration | FR-EXPORT | 片尾                             | 最末 1s 亮度趨降（淡出）               |
+| TCS-ENDING-001   | Integration | FR-EXPORT | 預設 `assets\\ending.mp4` 存在                        | 影片尾段應與結尾影片內容銜接，且最終畫面須無黑邊滿版呈現；輸出 metadata 需回報 ending_offset_sec、ending_duration_sec；若檔案缺失則應標記略過。 |
 | TCS-LOG-001      | Integration | FR-OPS    | 缺圖/缺音                          | 流程不中斷；日誌 WARNING             |
 | TCS-DRYRUN-001   | E2E         | NFR       | `--dry-run`                    | 不輸出檔案；列出缺資產；exit code=0      |
 | TCS-LETTERS-002  | Integration | FR-INPUT  | `--dry-run` 與 `letters` 圖片化       | dry-run 應驗證 `assets/AZ/` 中所需的字母圖片是否齊全；列出缺失圖片的檔名，並確認在正常執行模式下缺失字元位置會留白（非文字替代）。 |

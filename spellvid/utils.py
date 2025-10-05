@@ -71,6 +71,10 @@ _DEFAULT_ENTRY_VIDEO_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "assets", "entry.mp4")
 )
 
+_DEFAULT_ENDING_VIDEO_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "assets", "ending.mp4")
+)
+
 # Main background color for render_video_moviepy (RGB tuple).
 # Change this constant to control the default full-screen background color.
 MAIN_BG_COLOR = (255, 250, 233)
@@ -106,6 +110,27 @@ def _is_entry_enabled(item: Dict[str, Any] | None = None) -> bool:
         return _coerce_bool(item.get("entry_enabled"), True)
     if "entry_disabled" in item:
         return not _coerce_bool(item.get("entry_disabled"), False)
+    return True
+
+
+def _resolve_ending_video_path(item: Dict[str, Any] | None = None) -> str:
+    if item:
+        override = item.get("ending_video_path") or item.get("ending_path")
+        if override:
+            return os.path.abspath(str(override))
+    env_override = os.environ.get("SPELLVID_ENDING_VIDEO_PATH")
+    if env_override:
+        return os.path.abspath(env_override)
+    return _DEFAULT_ENDING_VIDEO_PATH
+
+
+def _is_ending_enabled(item: Dict[str, Any] | None = None) -> bool:
+    if not item:
+        return True
+    if "ending_enabled" in item:
+        return _coerce_bool(item.get("ending_enabled"), True)
+    if "ending_disabled" in item:
+        return not _coerce_bool(item.get("ending_disabled"), False)
     return True
 
 
@@ -208,6 +233,29 @@ def _prepare_entry_context(item: Dict[str, Any] | None = None) -> Dict[str, Any]
         "duration_sec": duration,
         "hold_sec": hold,
         "total_lead_sec": total_lead,
+        "enabled": True,
+    }
+
+
+def _prepare_ending_context(item: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    path = _resolve_ending_video_path(item)
+    enabled = _is_ending_enabled(item)
+    if not enabled:
+        return {
+            "path": path,
+            "exists": False,
+            "duration_sec": 0.0,
+            "total_tail_sec": 0.0,
+            "enabled": False,
+        }
+    exists = os.path.isfile(path)
+    duration = _probe_media_duration(path) if exists else None
+    total_tail = float(duration or 0.0) if duration else 0.0
+    return {
+        "path": path,
+        "exists": bool(exists),
+        "duration_sec": duration,
+        "total_tail_sec": total_tail,
         "enabled": True,
     }
 
@@ -1485,6 +1533,11 @@ def render_video_stub(
     entry_offset_runtime = entry_offset
     entry_duration_runtime = entry_duration
 
+    ending_ctx = _prepare_ending_context(item)
+    ending_duration_runtime = float(ending_ctx.get(
+        "total_tail_sec") or ending_ctx.get("duration_sec") or 0.0)
+    ending_offset_runtime = 0.0
+
     countdown = int(item.get("countdown_sec", 10))
     reveal_hold = int(item.get("reveal_hold_sec", 5))
     word_en = item.get("word_en", "")
@@ -1492,7 +1545,8 @@ def render_video_stub(
     per = 1.0
     total_reveal_time = per * n_for_timing
     main_duration = float(countdown + total_reveal_time + reveal_hold)
-    total_duration_runtime = float(entry_offset_runtime + main_duration)
+    runtime_after_main = float(entry_offset_runtime + main_duration)
+    total_duration_runtime = runtime_after_main
 
     progress_enabled = bool(item.get("progress_bar", True))
     progress_segments: List[Dict[str, Any]] = []
@@ -1551,6 +1605,18 @@ def render_video_stub(
         if S <= countdown:
             beep_schedule.append(float(max(0.0, countdown - S)))
 
+    ending_offset_runtime = runtime_after_main
+    if not ending_ctx.get("enabled", True) or not ending_ctx.get("exists"):
+        ending_duration_runtime = 0.0
+    total_duration_runtime = float(
+        ending_offset_runtime + ending_duration_runtime)
+    ending_runtime = dict(ending_ctx)
+    ending_runtime["loaded"] = bool(ending_ctx.get("exists"))
+    ending_runtime["error"] = None
+    ending_runtime["duration_sec"] = ending_duration_runtime
+    ending_runtime["total_tail_sec"] = ending_duration_runtime
+    ending_runtime["size"] = (1920, 1080) if ending_ctx.get("exists") else None
+
     beep_schedule_timeline = [
         round(entry_offset_runtime + t, 6) for t in beep_schedule
     ]
@@ -1578,6 +1644,9 @@ def render_video_stub(
             "entry_offset_sec": entry_offset_runtime,
             "entry_duration_sec": entry_duration_runtime,
             "entry_hold_sec": entry_hold,
+            "ending_info": ending_runtime,
+            "ending_offset_sec": ending_offset_runtime,
+            "ending_duration_sec": ending_duration_runtime,
             "total_duration_sec": total_duration_runtime,
         }
 
@@ -1605,6 +1674,9 @@ def render_video_stub(
         "entry_offset_sec": entry_offset_runtime,
         "entry_duration_sec": entry_duration_runtime,
         "entry_hold_sec": entry_hold,
+        "ending_info": ending_runtime,
+        "ending_offset_sec": ending_offset_runtime,
+        "ending_duration_sec": ending_duration_runtime,
         "total_duration_sec": total_duration_runtime,
     }
 
@@ -1631,6 +1703,14 @@ def render_video_moviepy(
     entry_offset_runtime = entry_offset
     entry_duration_runtime = entry_duration
 
+    ending_ctx = _prepare_ending_context(item)
+    ending_duration_runtime = float(ending_ctx.get(
+        "total_tail_sec") or ending_ctx.get("duration_sec") or 0.0)
+    ending_offset_runtime = 0.0
+    ending_clip_obj = None
+    ending_loaded = False
+    ending_error: Optional[str] = None
+
     countdown = int(item.get("countdown_sec", 10))
     # reveal_hold_sec is now the time to hold AFTER the reveal completes
     reveal_hold = int(item.get("reveal_hold_sec", 5))
@@ -1646,7 +1726,8 @@ def render_video_moviepy(
     # plus post-reveal hold
     duration = float(countdown + total_reveal_time + reveal_hold)
     main_duration = duration
-    total_duration_runtime = float(entry_offset_runtime + main_duration)
+    runtime_after_main = float(entry_offset_runtime + main_duration)
+    total_duration_runtime = runtime_after_main
 
     progress_enabled = bool(item.get("progress_bar", True))
     progress_segments: List[Dict[str, Any]] = []
@@ -1708,6 +1789,20 @@ def render_video_moviepy(
     beep_schedule_timeline = [
         round(entry_offset_runtime + t, 6) for t in beep_schedule
     ]
+
+    ending_runtime = dict(ending_ctx)
+    ending_runtime["loaded"] = ending_loaded
+    ending_runtime["error"] = ending_error
+    ending_runtime["duration_sec"] = ending_duration_runtime
+    ending_runtime["total_tail_sec"] = ending_duration_runtime
+    try:
+        size_attr = getattr(ending_clip_obj, "size", None)
+        if size_attr:
+            ending_runtime["size"] = (int(size_attr[0]), int(size_attr[1]))
+        else:
+            ending_runtime["size"] = None
+    except Exception:
+        ending_runtime["size"] = None
 
     letters_ctx = _prepare_letters_context(item)
     letters_mode = letters_ctx.get("mode")
@@ -2844,12 +2939,74 @@ def render_video_moviepy(
                 w, h = int(size[0]), int(size[1])
                 if (w, h) != (1920, 1080):
                     try:
-                        clip = clip.resize(newsize=(1920, 1080))
+                        clip = clip.resized(new_size=(1920, 1080))
                     except Exception:
                         pass
         except Exception:
             pass
         return clip
+
+    def _ensure_fullscreen_cover(clip):
+        try:
+            size = getattr(clip, "size", None)
+            if not size:
+                return clip
+            w, h = float(size[0]), float(size[1])
+            if w <= 0 or h <= 0:
+                return clip
+            target_w, target_h = 1920.0, 1080.0
+            # 總是執行非等比例縮放，確保完整畫面無裁剪
+            try:
+                clip = clip.resized(new_size=(int(target_w), int(target_h)))
+            except Exception:
+                return clip
+        except Exception:
+            pass
+        return clip
+
+    def _auto_letterbox_crop(clip):
+        try:
+            sample_points = [0.0]
+            try:
+                dur = float(getattr(clip, "duration", 0.0) or 0.0)
+            except Exception:
+                dur = 0.0
+            if dur > 0.5:
+                sample_points.append(max(0.0, dur / 2.0))
+            frame = None
+            for t in sample_points:
+                try:
+                    frame = clip.get_frame(t)
+                    if frame is not None:
+                        break
+                except Exception:
+                    frame = None
+            if frame is None:
+                return clip
+            arr = _np.asarray(frame)
+            if arr.ndim == 3:
+                gray = arr.mean(axis=2)
+            else:
+                gray = arr.astype(float)
+            valid = gray > 15.0
+            if not valid.any():
+                return clip
+            rows = _np.where(valid.any(axis=1))[0]
+            cols = _np.where(valid.any(axis=0))[0]
+            if rows.size == 0 or cols.size == 0:
+                return clip
+            top, bottom = int(rows[0]), int(rows[-1])
+            left, right = int(cols[0]), int(cols[-1])
+            if top <= 2 and left <= 2 and bottom >= arr.shape[0] - 3 and right >= arr.shape[1] - 3:
+                return clip
+            pad = 2
+            top = max(0, top - pad)
+            left = max(0, left - pad)
+            bottom = min(arr.shape[0] - 1, bottom + pad)
+            right = min(arr.shape[1] - 1, right + pad)
+            return clip.cropped(x1=float(left), y1=float(top), x2=float(right + 1), y2=float(bottom + 1))
+        except Exception:
+            return clip
 
     if entry_ctx.get("exists"):
         try:
@@ -2943,6 +3100,43 @@ def render_video_moviepy(
                 except Exception:
                     entry_error = "entry hold failed"
 
+    if not ending_ctx.get("enabled", True):
+        ending_duration_runtime = 0.0
+        ending_clip_obj = None
+    elif ending_ctx.get("exists"):
+        try:
+            ending_clip_raw = _mpy.VideoFileClip(ending_ctx["path"])
+            cleanup_clips.append(ending_clip_raw)
+            processed_clip = ending_clip_raw
+            for transformer in (_auto_letterbox_crop, _ensure_dimensions, _ensure_fullscreen_cover):
+                try:
+                    candidate = transformer(processed_clip)
+                except Exception:
+                    candidate = processed_clip
+                if candidate is None:
+                    candidate = processed_clip
+                if candidate is not processed_clip:
+                    cleanup_clips.append(candidate)
+                    processed_clip = candidate
+            ending_clip_obj = processed_clip
+            ending_loaded = True
+            try:
+                clip_dur = float(
+                    getattr(ending_clip_obj, "duration", 0.0) or 0.0)
+            except Exception:
+                clip_dur = 0.0
+            if clip_dur > 0.0:
+                ending_duration_runtime = clip_dur
+        except Exception as exc:
+            ending_clip_obj = None
+            ending_loaded = False
+            try:
+                ending_error = f"ending load failed: {exc}"
+            except Exception:
+                ending_error = "ending load failed"
+    else:
+        ending_clip_obj = None
+
     concat_clips = []
     if entry_clip_obj is not None:
         concat_clips.append(entry_clip_obj)
@@ -2951,6 +3145,8 @@ def render_video_moviepy(
     elif hold_clip is not None:
         concat_clips.append(hold_clip)
     concat_clips.append(main_clip)
+    if ending_clip_obj is not None:
+        concat_clips.append(ending_clip_obj)
 
     if len(concat_clips) == 1:
         final_clip = main_clip
@@ -2971,6 +3167,14 @@ def render_video_moviepy(
         else total_duration_runtime
     )
     total_duration_runtime = final_duration
+    ending_offset_runtime = runtime_after_main
+    if ending_ctx.get("enabled", True) and (ending_clip_obj is not None or ending_ctx.get("exists")):
+        ending_duration_runtime = max(
+            0.0, final_duration - ending_offset_runtime)
+    else:
+        ending_duration_runtime = 0.0
+    if ending_duration_runtime < 0.0:
+        ending_duration_runtime = 0.0
 
     try:
         for seg in progress_segments:
@@ -3000,6 +3204,21 @@ def render_video_moviepy(
     beep_schedule_timeline = [
         round(entry_offset_runtime + t, 6) for t in beep_schedule
     ]
+
+    # Update ending_runtime after actual loading
+    ending_runtime = dict(ending_ctx)
+    ending_runtime["loaded"] = ending_loaded
+    ending_runtime["error"] = ending_error
+    ending_runtime["duration_sec"] = ending_duration_runtime
+    ending_runtime["total_tail_sec"] = ending_duration_runtime
+    try:
+        size_attr = getattr(ending_clip_obj, "size", None)
+        if size_attr:
+            ending_runtime["size"] = (int(size_attr[0]), int(size_attr[1]))
+        else:
+            ending_runtime["size"] = None
+    except Exception:
+        ending_runtime["size"] = None
 
     # ensure out dir
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -3055,6 +3274,9 @@ def render_video_moviepy(
             "entry_offset_sec": entry_offset_runtime,
             "entry_duration_sec": entry_duration_runtime,
             "entry_hold_sec": entry_hold,
+            "ending_info": ending_runtime,
+            "ending_offset_sec": ending_offset_runtime,
+            "ending_duration_sec": ending_duration_runtime,
             "total_duration_sec": total_duration_runtime,
         }
 
@@ -3112,5 +3334,8 @@ def render_video_moviepy(
         "entry_offset_sec": entry_offset_runtime,
         "entry_duration_sec": entry_duration_runtime,
         "entry_hold_sec": entry_hold,
+        "ending_info": ending_runtime,
+        "ending_offset_sec": ending_offset_runtime,
+        "ending_duration_sec": ending_duration_runtime,
         "total_duration_sec": total_duration_runtime,
     }
