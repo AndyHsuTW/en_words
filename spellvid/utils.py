@@ -79,6 +79,10 @@ _DEFAULT_ENDING_VIDEO_PATH = os.path.abspath(
 # Change this constant to control the default full-screen background color.
 MAIN_BG_COLOR = (255, 250, 233)
 
+# Video transition effects constants
+FADE_OUT_DURATION = 3.0  # seconds - duration of fade to black at video end
+FADE_IN_DURATION = 1.0   # seconds - duration of fade from black at video start
+
 
 def _coerce_non_negative_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -1681,6 +1685,272 @@ def render_video_stub(
     }
 
 
+def _apply_fadeout(clip, duration: float = None):
+    """Apply fade-out effect to video clip (both video and audio).
+    
+    Args:
+        clip: MoviePy VideoClip object
+        duration: Fade-out duration in seconds. If None, uses FADE_OUT_DURATION.
+    
+    Returns:
+        VideoClip with fade-out effect applied, or original clip if conditions not met.
+    """
+    if not _HAS_MOVIEPY or clip is None:
+        return clip
+    
+    if duration is None:
+        duration = FADE_OUT_DURATION
+    
+    # Skip fade-out if video is too short
+    if clip.duration < duration:
+        return clip
+    
+    # Apply video fade-out using MoviePy FX
+    try:
+        from moviepy.video.fx.FadeOut import FadeOut
+        effect = FadeOut(duration)
+        clip_with_fadeout = effect.apply(clip)
+    except Exception:
+        # Fallback if FadeOut not available
+        return clip
+    
+    # Apply audio fade-out if audio exists
+    if clip_with_fadeout.audio is not None:
+        try:
+            from moviepy.audio.fx.AudioFadeOut import AudioFadeOut
+            audio_effect = AudioFadeOut(duration)
+            clip_with_fadeout = clip_with_fadeout.with_audio(
+                audio_effect.apply(clip_with_fadeout.audio)
+            )
+        except Exception:
+            # If audio fadeout fails, continue with video fadeout only
+            pass
+    
+    return clip_with_fadeout
+
+
+def _apply_fadein(clip, duration: float = None, apply_audio: bool = False):
+    """Apply fade-in effect to video clip.
+    
+    Args:
+        clip: MoviePy VideoClip object
+        duration: Fade-in duration in seconds. If None, uses FADE_IN_DURATION.
+        apply_audio: If True, also apply fade-in to audio (Phase 3 feature).
+    
+    Returns:
+        VideoClip with fade-in effect applied, or original clip if conditions not met.
+    """
+    if not _HAS_MOVIEPY or clip is None:
+        return clip
+    
+    if duration is None:
+        duration = FADE_IN_DURATION
+    
+    # Skip fade-in if video is too short
+    if clip.duration < duration:
+        return clip
+    
+    # Apply video fade-in using MoviePy FX
+    try:
+        from moviepy.video.fx.FadeIn import FadeIn
+        effect = FadeIn(duration)
+        clip_with_fadein = effect.apply(clip)
+    except Exception:
+        # Fallback if FadeIn not available
+        return clip
+    
+    # Phase 3: Apply audio fade-in if requested
+    if apply_audio and clip_with_fadein.audio is not None:
+        try:
+            from moviepy.audio.fx.AudioFadeIn import AudioFadeIn
+            audio_effect = AudioFadeIn(duration)
+            clip_with_fadein = clip_with_fadein.with_audio(
+                audio_effect.apply(clip_with_fadein.audio)
+            )
+        except Exception:
+            # If audio fadein fails, continue with video fadein only
+            pass
+    
+    return clip_with_fadein
+
+
+def concatenate_videos_with_transitions(
+    video_paths: List[str],
+    output_path: str,
+    fade_in_duration: float = None,
+    apply_audio_fadein: bool = False,
+) -> Dict[str, Any]:
+    """Concatenate multiple videos with transition effects.
+    
+    This function loads multiple video files, applies fade-in effects to all videos
+    except the first one (per D2 decision), and concatenates them into a single output.
+    Each input video is expected to already have fade-out applied (from render phase).
+    
+    Args:
+        video_paths: List of video file paths to concatenate (in order)
+        output_path: Path for the final concatenated output video
+        fade_in_duration: Fade-in duration in seconds. If None, uses FADE_IN_DURATION.
+        apply_audio_fadein: If True, also apply fade-in to audio (Phase 3 feature).
+    
+    Returns:
+        Dictionary with status information:
+        - status: "ok" | "error" | "skipped"
+        - message: Error message if status is "error"
+        - output: Output file path if successful
+        - clips_count: Number of clips concatenated
+        - total_duration: Total duration of concatenated video
+    
+    Decision References:
+        - D1: All videos have fade-out (applied during render)
+        - D2: First video does not have fade-in; subsequent videos have 1s fade-in
+        - D4: Audio fade-in is controlled by apply_audio_fadein parameter
+    """
+    if not _HAS_MOVIEPY:
+        return {
+            "status": "error",
+            "message": "MoviePy not available for video concatenation"
+        }
+    
+    if not video_paths:
+        return {
+            "status": "error",
+            "message": "No video paths provided for concatenation"
+        }
+    
+    if fade_in_duration is None:
+        fade_in_duration = FADE_IN_DURATION
+    
+    clips = []
+    cleanup_clips = []
+    
+    try:
+        # Load and process each video
+        for idx, path in enumerate(video_paths):
+            if not os.path.exists(path):
+                # Clean up already loaded clips
+                for clip in cleanup_clips:
+                    try:
+                        clip.close()
+                    except Exception:
+                        pass
+                return {
+                    "status": "error",
+                    "message": f"Video file not found: {path}"
+                }
+            
+            try:
+                # Load video clip
+                clip = _mpy.VideoFileClip(path)
+                cleanup_clips.append(clip)
+                
+                # D2 Decision: First video does not fade in
+                if idx == 0:
+                    # First video: use as-is (already has fade-out from render)
+                    clips.append(clip)
+                else:
+                    # Subsequent videos: apply fade-in
+                    clip_with_fadein = _apply_fadein(
+                        clip,
+                        duration=fade_in_duration,
+                        apply_audio=apply_audio_fadein
+                    )
+                    clips.append(clip_with_fadein)
+            
+            except Exception as e:
+                # Clean up on error
+                for clip in cleanup_clips:
+                    try:
+                        clip.close()
+                    except Exception:
+                        pass
+                return {
+                    "status": "error",
+                    "message": f"Failed to load video {path}: {str(e)}"
+                }
+        
+        # Concatenate all clips
+        try:
+            final_clip = _mpy.concatenate_videoclips(clips, method="compose")
+        except Exception:
+            # Fallback to default method if 'compose' fails
+            try:
+                final_clip = _mpy.concatenate_videoclips(clips)
+            except Exception as e:
+                # Clean up
+                for clip in cleanup_clips:
+                    try:
+                        clip.close()
+                    except Exception:
+                        pass
+                return {
+                    "status": "error",
+                    "message": f"Failed to concatenate videos: {str(e)}"
+                }
+        
+        total_duration = float(getattr(final_clip, "duration", 0) or 0)
+        
+        # Write output video
+        try:
+            # Create output directory if needed
+            output_dir = os.path.dirname(output_path)
+            if output_dir and not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+            
+            # Use ffmpeg settings similar to render_video_moviepy
+            ffmpeg_exe = os.environ.get("IMAGEIO_FFMPEG_EXE")
+            if ffmpeg_exe:
+                final_clip.write_videofile(
+                    output_path,
+                    fps=30,
+                    codec="libx264",
+                    audio_codec="aac",
+                    threads=4,
+                    preset="medium",
+                )
+            else:
+                # Fallback: simple call
+                final_clip.write_videofile(output_path, fps=30)
+        
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to write output video: {str(e)}"
+            }
+        
+        finally:
+            # Clean up all clips
+            try:
+                final_clip.close()
+            except Exception:
+                pass
+            
+            for clip in cleanup_clips:
+                try:
+                    clip.close()
+                except Exception:
+                    pass
+        
+        return {
+            "status": "ok",
+            "output": output_path,
+            "clips_count": len(clips),
+            "total_duration": total_duration,
+        }
+    
+    except Exception as e:
+        # Catch-all error handler
+        for clip in cleanup_clips:
+            try:
+                clip.close()
+            except Exception:
+                pass
+        
+        return {
+            "status": "error",
+            "message": f"Unexpected error during concatenation: {str(e)}"
+        }
+
+
 def render_video_moviepy(
     item: Dict[str, Any], out_path: str, dry_run: bool = False
 ) -> Dict[str, Any]:
@@ -2925,6 +3195,11 @@ def render_video_moviepy(
             main_clip = main_clip.with_audio(final_audio)
         except Exception:
             pass
+
+    # Apply fade-out effect to main content (D1: all videos fade out uniformly)
+    # This is applied before concatenating with entry/ending clips
+    # Note: ending.mp4 will not have additional fade-out (D8 decision)
+    main_clip = _apply_fadeout(main_clip, duration=FADE_OUT_DURATION)
 
     entry_loaded = False
     entry_error = None

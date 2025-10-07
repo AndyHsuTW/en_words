@@ -176,3 +176,8 @@ out/
 assets/
 
 tasks-done-for-commit.md
+
+# optional: ignore local cache or logs if they exist
+.specify/tmp/
+.specify/cache/
+.specify/memory/local/

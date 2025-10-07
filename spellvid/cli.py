@@ -36,6 +36,8 @@ def batch(args: argparse.Namespace) -> int:
             print("SCHEMA-ERROR:", e)
         return 2
     summary = {"ok": 0, "skipped": 0, "errors": []}
+    output_paths = []  # Collect successful output paths for concatenation
+    
     for item in data:
         if "letters_as_image" not in item:
             item["letters_as_image"] = getattr(args, "letters_as_image", True)
@@ -73,10 +75,37 @@ def batch(args: argparse.Namespace) -> int:
             )
             if res.get("status") == "ok":
                 summary["ok"] += 1
+                output_paths.append(out_path)  # Track successful outputs
             else:
                 summary["skipped"] += 1
         except Exception as e:
             summary["errors"].append(str(e))
+    
+    # If --out-file is specified and we have successful outputs, concatenate them
+    out_file = getattr(args, "out_file", None)
+    if out_file and output_paths and not args.dry_run:
+        print(f"\nConcatenating {len(output_paths)} videos into {out_file}...")
+        # D4 Decision: Audio fade-in is now enabled by default (Phase 3)
+        # Can be disabled with --no-audio-fadein flag
+        apply_audio_fadein = not getattr(args, "no_audio_fadein", False)
+        concat_result = utils.concatenate_videos_with_transitions(
+            output_paths,
+            out_file,
+            fade_in_duration=getattr(args, "fade_in_duration", None),
+            apply_audio_fadein=apply_audio_fadein,
+        )
+        
+        if concat_result.get("status") == "ok":
+            print(f"✓ Concatenation successful: {out_file}")
+            print(f"  - Total clips: {concat_result.get('clips_count', 0)}")
+            print(f"  - Total duration: {concat_result.get('total_duration', 0):.2f}s")
+            summary["concatenated"] = True
+            summary["concat_output"] = out_file
+        else:
+            print(f"✗ Concatenation failed: {concat_result.get('message', 'Unknown error')}")
+            summary["concat_error"] = concat_result.get("message")
+            return 3  # Return error code for concatenation failure
+    
     print(summary)
     return 0
 
@@ -195,6 +224,37 @@ def build_parser():
     )
     p_batch.set_defaults(progress_bar=True, timer_visible=True, letters_as_image=True)
 
+    p_batch.add_argument(
+        "--out-file",
+        dest="out_file",
+        default=None,
+        help="concatenate all videos into a single output file (with transitions)",
+    )
+    
+    # Phase 3: Transition effect customization parameters
+    p_batch.add_argument(
+        "--fade-out-duration",
+        type=float,
+        dest="fade_out_duration",
+        default=None,
+        help="custom fade-out duration in seconds (default: 3.0)",
+    )
+    
+    p_batch.add_argument(
+        "--fade-in-duration",
+        type=float,
+        dest="fade_in_duration",
+        default=None,
+        help="custom fade-in duration in seconds (default: 1.0)",
+    )
+    
+    p_batch.add_argument(
+        "--no-audio-fadein",
+        dest="no_audio_fadein",
+        action="store_true",
+        help="disable audio fade-in (video will still fade in, but audio starts immediately)",
+    )
+    
     p_batch.add_argument(
         "--use-moviepy", action="store_true", dest="use_moviepy"
     )
