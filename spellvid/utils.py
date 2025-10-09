@@ -1499,14 +1499,30 @@ def render_video_stub(
     out_path: str,
     dry_run: bool = False,
     use_moviepy: bool = False,
+    skip_ending: bool = False,
 ) -> Dict[str, Any]:
     """Render video.
 
-    If MoviePy is available and use_moviepy is True, call the real renderer.
-    Otherwise fallback to the small stub that writes a placeholder file.
+    Args:
+        item: Video configuration dictionary with word, letters, assets.
+        out_path: Output file path for the rendered video.
+        dry_run: If True, only compute metadata without rendering.
+        use_moviepy: If True and MoviePy available, use real renderer.
+        skip_ending: If True, skip ending video (for batch processing).
+                     Default False maintains backward compatibility.
+
+    Returns:
+        Dictionary with rendering results and metadata.
+
+    Note:
+        skip_ending is for batch video processing to prevent ending
+        video after every word. In batch mode, only the last video
+        should have skip_ending=False.
     """
     if use_moviepy and _HAS_MOVIEPY:
-        return render_video_moviepy(item, out_path, dry_run=dry_run)
+        return render_video_moviepy(
+            item, out_path, dry_run=dry_run, skip_ending=skip_ending
+        )
 
     letters_ctx = _prepare_letters_context(item)
     letters_mode = letters_ctx.get("mode")
@@ -1610,7 +1626,10 @@ def render_video_stub(
             beep_schedule.append(float(max(0.0, countdown - S)))
 
     ending_offset_runtime = runtime_after_main
-    if not ending_ctx.get("enabled", True) or not ending_ctx.get("exists"):
+    # Apply skip_ending logic: if skip_ending=True, set duration to 0
+    if skip_ending:
+        ending_duration_runtime = 0.0
+    elif not ending_ctx.get("enabled", True) or not ending_ctx.get("exists"):
         ending_duration_runtime = 0.0
     total_duration_runtime = float(
         ending_offset_runtime + ending_duration_runtime)
@@ -1687,24 +1706,24 @@ def render_video_stub(
 
 def _apply_fadeout(clip, duration: float = None):
     """Apply fade-out effect to video clip (both video and audio).
-    
+
     Args:
         clip: MoviePy VideoClip object
         duration: Fade-out duration in seconds. If None, uses FADE_OUT_DURATION.
-    
+
     Returns:
         VideoClip with fade-out effect applied, or original clip if conditions not met.
     """
     if not _HAS_MOVIEPY or clip is None:
         return clip
-    
+
     if duration is None:
         duration = FADE_OUT_DURATION
-    
+
     # Skip fade-out if video is too short
     if clip.duration < duration:
         return clip
-    
+
     # Apply video fade-out using MoviePy FX
     try:
         from moviepy.video.fx.FadeOut import FadeOut
@@ -1713,7 +1732,7 @@ def _apply_fadeout(clip, duration: float = None):
     except Exception:
         # Fallback if FadeOut not available
         return clip
-    
+
     # Apply audio fade-out if audio exists
     if clip_with_fadeout.audio is not None:
         try:
@@ -1725,31 +1744,31 @@ def _apply_fadeout(clip, duration: float = None):
         except Exception:
             # If audio fadeout fails, continue with video fadeout only
             pass
-    
+
     return clip_with_fadeout
 
 
 def _apply_fadein(clip, duration: float = None, apply_audio: bool = False):
     """Apply fade-in effect to video clip.
-    
+
     Args:
         clip: MoviePy VideoClip object
         duration: Fade-in duration in seconds. If None, uses FADE_IN_DURATION.
         apply_audio: If True, also apply fade-in to audio (Phase 3 feature).
-    
+
     Returns:
         VideoClip with fade-in effect applied, or original clip if conditions not met.
     """
     if not _HAS_MOVIEPY or clip is None:
         return clip
-    
+
     if duration is None:
         duration = FADE_IN_DURATION
-    
+
     # Skip fade-in if video is too short
     if clip.duration < duration:
         return clip
-    
+
     # Apply video fade-in using MoviePy FX
     try:
         from moviepy.video.fx.FadeIn import FadeIn
@@ -1758,7 +1777,7 @@ def _apply_fadein(clip, duration: float = None, apply_audio: bool = False):
     except Exception:
         # Fallback if FadeIn not available
         return clip
-    
+
     # Phase 3: Apply audio fade-in if requested
     if apply_audio and clip_with_fadein.audio is not None:
         try:
@@ -1770,7 +1789,7 @@ def _apply_fadein(clip, duration: float = None, apply_audio: bool = False):
         except Exception:
             # If audio fadein fails, continue with video fadein only
             pass
-    
+
     return clip_with_fadein
 
 
@@ -1781,17 +1800,17 @@ def concatenate_videos_with_transitions(
     apply_audio_fadein: bool = False,
 ) -> Dict[str, Any]:
     """Concatenate multiple videos with transition effects.
-    
+
     This function loads multiple video files, applies fade-in effects to all videos
     except the first one (per D2 decision), and concatenates them into a single output.
     Each input video is expected to already have fade-out applied (from render phase).
-    
+
     Args:
         video_paths: List of video file paths to concatenate (in order)
         output_path: Path for the final concatenated output video
         fade_in_duration: Fade-in duration in seconds. If None, uses FADE_IN_DURATION.
         apply_audio_fadein: If True, also apply fade-in to audio (Phase 3 feature).
-    
+
     Returns:
         Dictionary with status information:
         - status: "ok" | "error" | "skipped"
@@ -1799,7 +1818,7 @@ def concatenate_videos_with_transitions(
         - output: Output file path if successful
         - clips_count: Number of clips concatenated
         - total_duration: Total duration of concatenated video
-    
+
     Decision References:
         - D1: All videos have fade-out (applied during render)
         - D2: First video does not have fade-in; subsequent videos have 1s fade-in
@@ -1810,19 +1829,19 @@ def concatenate_videos_with_transitions(
             "status": "error",
             "message": "MoviePy not available for video concatenation"
         }
-    
+
     if not video_paths:
         return {
             "status": "error",
             "message": "No video paths provided for concatenation"
         }
-    
+
     if fade_in_duration is None:
         fade_in_duration = FADE_IN_DURATION
-    
+
     clips = []
     cleanup_clips = []
-    
+
     try:
         # Load and process each video
         for idx, path in enumerate(video_paths):
@@ -1837,12 +1856,12 @@ def concatenate_videos_with_transitions(
                     "status": "error",
                     "message": f"Video file not found: {path}"
                 }
-            
+
             try:
                 # Load video clip
                 clip = _mpy.VideoFileClip(path)
                 cleanup_clips.append(clip)
-                
+
                 # D2 Decision: First video does not fade in
                 if idx == 0:
                     # First video: use as-is (already has fade-out from render)
@@ -1855,7 +1874,7 @@ def concatenate_videos_with_transitions(
                         apply_audio=apply_audio_fadein
                     )
                     clips.append(clip_with_fadein)
-            
+
             except Exception as e:
                 # Clean up on error
                 for clip in cleanup_clips:
@@ -1867,7 +1886,7 @@ def concatenate_videos_with_transitions(
                     "status": "error",
                     "message": f"Failed to load video {path}: {str(e)}"
                 }
-        
+
         # Concatenate all clips
         try:
             final_clip = _mpy.concatenate_videoclips(clips, method="compose")
@@ -1886,16 +1905,16 @@ def concatenate_videos_with_transitions(
                     "status": "error",
                     "message": f"Failed to concatenate videos: {str(e)}"
                 }
-        
+
         total_duration = float(getattr(final_clip, "duration", 0) or 0)
-        
+
         # Write output video
         try:
             # Create output directory if needed
             output_dir = os.path.dirname(output_path)
             if output_dir and not os.path.exists(output_dir):
                 os.makedirs(output_dir, exist_ok=True)
-            
+
             # Use ffmpeg settings similar to render_video_moviepy
             ffmpeg_exe = os.environ.get("IMAGEIO_FFMPEG_EXE")
             if ffmpeg_exe:
@@ -1910,33 +1929,33 @@ def concatenate_videos_with_transitions(
             else:
                 # Fallback: simple call
                 final_clip.write_videofile(output_path, fps=30)
-        
+
         except Exception as e:
             return {
                 "status": "error",
                 "message": f"Failed to write output video: {str(e)}"
             }
-        
+
         finally:
             # Clean up all clips
             try:
                 final_clip.close()
             except Exception:
                 pass
-            
+
             for clip in cleanup_clips:
                 try:
                     clip.close()
                 except Exception:
                     pass
-        
+
         return {
             "status": "ok",
             "output": output_path,
             "clips_count": len(clips),
             "total_duration": total_duration,
         }
-    
+
     except Exception as e:
         # Catch-all error handler
         for clip in cleanup_clips:
@@ -1944,7 +1963,7 @@ def concatenate_videos_with_transitions(
                 clip.close()
             except Exception:
                 pass
-        
+
         return {
             "status": "error",
             "message": f"Unexpected error during concatenation: {str(e)}"
@@ -1952,7 +1971,10 @@ def concatenate_videos_with_transitions(
 
 
 def render_video_moviepy(
-    item: Dict[str, Any], out_path: str, dry_run: bool = False
+    item: Dict[str, Any],
+    out_path: str,
+    dry_run: bool = False,
+    skip_ending: bool = False,
 ) -> Dict[str, Any]:
     """Real video rendering using MoviePy.
 
@@ -1962,6 +1984,9 @@ def render_video_moviepy(
     - countdown timer on left side (updates every second)
     - reveal (bottom center) appears after countdown with typewriter effect
     - optional music and short beeps in last 3 seconds
+
+    Args:
+        skip_ending: If True, skip appending ending video (batch mode).
     """
     if not _HAS_MOVIEPY:
         raise RuntimeError("MoviePy not available")
@@ -3375,7 +3400,11 @@ def render_video_moviepy(
                 except Exception:
                     entry_error = "entry hold failed"
 
-    if not ending_ctx.get("enabled", True):
+    # Apply skip_ending logic: if skip_ending=True, don't load ending
+    if skip_ending:
+        ending_duration_runtime = 0.0
+        ending_clip_obj = None
+    elif not ending_ctx.get("enabled", True):
         ending_duration_runtime = 0.0
         ending_clip_obj = None
     elif ending_ctx.get("exists"):
@@ -3383,7 +3412,12 @@ def render_video_moviepy(
             ending_clip_raw = _mpy.VideoFileClip(ending_ctx["path"])
             cleanup_clips.append(ending_clip_raw)
             processed_clip = ending_clip_raw
-            for transformer in (_auto_letterbox_crop, _ensure_dimensions, _ensure_fullscreen_cover):
+            transformers = (
+                _auto_letterbox_crop,
+                _ensure_dimensions,
+                _ensure_fullscreen_cover,
+            )
+            for transformer in transformers:
                 try:
                     candidate = transformer(processed_clip)
                 except Exception:
@@ -3420,7 +3454,8 @@ def render_video_moviepy(
     elif hold_clip is not None:
         concat_clips.append(hold_clip)
     concat_clips.append(main_clip)
-    if ending_clip_obj is not None:
+    # Only append ending if not skipped
+    if ending_clip_obj is not None and not skip_ending:
         concat_clips.append(ending_clip_obj)
 
     if len(concat_clips) == 1:

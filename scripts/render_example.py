@@ -190,12 +190,20 @@ if args.json_path and os.path.isfile(args.json_path):
             if final_out and len(cfg) == 1:
                 outp = final_out
 
+            # Determine if this is the last item in the batch
+            # Only the last item should have the ending video
+            is_last_item = (idx == len(cfg) - 1)
+            # For multi-item batches: skip ending on all but last video
+            # For single-item: always include ending (skip_ending=False)
+            skip_ending_flag = (not is_last_item) if len(cfg) > 1 else False
+
             print('rendering ->', outp)
             res = render_video_stub(
                 item,
                 outp,
                 dry_run=args.dry_run,
                 use_moviepy=args.use_moviepy,
+                skip_ending=skip_ending_flag,
             )
             print(json.dumps(res, ensure_ascii=False))
             results.append(res)
