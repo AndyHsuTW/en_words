@@ -16,9 +16,16 @@ Purpose: Give an AI coding agent the exact, discoverable knowledge needed to con
   6. `doc/` — `requirement.md` and `TDD.md` contain project intent, CLI examples, testing strategy and acceptance criteria. Good to cite for behavior expectations.
 
 - Big-picture architecture (short)
-  - Input: JSON array (schema in `spellvid/utils.py` as `SCHEMA`).
-  - Pipeline: parse JSON → validate schema → per-item layout computation (`compute_layout_bboxes`) → render text/image clips using Pillow + MoviePy (`_make_text_imageclip` / ImageClip) → optional audio/beep mixing → export via MoviePy which uses ffmpeg (configured by `_find_and_set_ffmpeg`).
+  - **NEW (重構中)**: 專案正在進行架構重構(branch: `002-refactor-architecture`),將單體 `utils.py` 拆分為分層模組:
+    - `spellvid/shared/` — 共用型別、常數、驗證邏輯
+    - `spellvid/domain/` — 領域邏輯(佈局、注音、效果、計時)
+    - `spellvid/application/` — 應用服務(視頻生成、批次處理、資源檢查)
+    - `spellvid/infrastructure/` — 基礎設施適配器(MoviePy、Pillow、FFmpeg)
+    - `spellvid/cli/` — CLI 命令入口
+  - Input: JSON array (schema in `spellvid/shared/validation.py` as `SCHEMA`).
+  - Pipeline: parse JSON → validate schema → per-item layout computation (`domain.layout.compute_layout_bboxes`) → render text/image clips using Pillow + MoviePy (`infrastructure.rendering` / `infrastructure.video`) → optional audio/beep mixing → export via MoviePy which uses ffmpeg (configured by `infrastructure.media.ffmpeg_wrapper`).
   - Output: MP4 per item, default path `out/{word_en}.mp4` (see `cli.batch` behavior).
+  - **向後相容**: `spellvid/utils.py` 保留但標記為 deprecated,re-export 新模組函數以維持測試通過。
 
 - Project-specific conventions & patterns
   - Tests may import and use internal (underscored) helpers from `spellvid.utils` (e.g. `_make_text_imageclip`) — don't rename or hide these without updating tests.
@@ -86,7 +93,17 @@ Purpose: Give an AI coding agent the exact, discoverable knowledge needed to con
   - Changing ffmpeg resolution order: update `_find_and_set_ffmpeg` and mention in README/docs + CI setup.
 
 - Where to add changes / tests
-  - Code changes: `spellvid/utils.py` (core), `spellvid/cli.py` (flags/behavior), `scripts/` for auxiliary helpers.
-  - Tests: `tests/` — follow existing style (pytest, skip when MoviePy missing). Add a unit test for any public helper you change and update layout pixel tests when behavior alters rendering.
+  - **NEW (重構後)**: 根據職責選擇模組:
+    - 純邏輯計算 → `spellvid/domain/` (佈局、注音、效果)
+    - 業務流程編排 → `spellvid/application/` (視頻服務、批次處理)
+    - 框架整合 → `spellvid/infrastructure/` (MoviePy/Pillow/FFmpeg 適配器)
+    - 型別與常數 → `spellvid/shared/`
+    - CLI 參數處理 → `spellvid/cli/`
+  - **舊模組**: `spellvid/utils.py` (已 deprecated,避免新增功能,僅保留向後相容)
+  - Tests: 
+    - 單元測試 → `tests/unit/{layer}/` (測試單一模組,不依賴外部資源)
+    - 契約測試 → `tests/contract/` (驗證介面實作符合 Protocol)
+    - 整合測試 → `tests/integration/` (測試多模組協作)
+    - 現有測試 → `tests/test_*.py` (保持通過,逐步遷移)
 
 If any section is unclear or you want more examples (e.g. CI job steps, ffprobe commands used in tests, or a sample failing test case), tell me which area to expand and I'll iterate.

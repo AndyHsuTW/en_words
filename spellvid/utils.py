@@ -1,3 +1,17 @@
+"""⚠️ DEPRECATED: spellvid.utils module
+
+This module is deprecated and will be removed in a future version.
+All functions are being migrated to the new modular architecture:
+- spellvid.shared: Types, constants, validation
+- spellvid.domain: Layout, typography, effects, timing
+- spellvid.infrastructure: MoviePy, Pillow, FFmpeg adapters
+- spellvid.application: Video service, batch service, resource checker
+- spellvid.cli: CLI commands and parsers
+
+See ARCHITECTURE.md for migration guide.
+"""
+
+import warnings
 import json
 import os
 import shutil
@@ -6,6 +20,15 @@ import tempfile
 from typing import Dict, List, Any, Tuple, Optional
 import numpy as _np
 from PIL import Image, ImageDraw, ImageFont
+
+# Issue deprecation warning
+warnings.warn(
+    "The spellvid.utils module is deprecated. "
+    "Please migrate to the new modular architecture. "
+    "See ARCHITECTURE.md for details.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 # moviepy imports are optional; try several fallbacks so utils can detect
 # moviepy whether it's packaged as `moviepy.editor` or `moviepy` module.
