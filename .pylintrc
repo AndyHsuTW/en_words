@@ -1,0 +1,41 @@
+[MASTER]
+# Python 程式碼風格檢查配置
+# SpellVid 專案 - 架構重構
+
+# 忽略的檔案或目錄
+ignore=CVS,.git,__pycache__,.venv,venv,FFmpeg,out,assets
+
+# 使用多處理加速
+jobs=4
+
+[MESSAGES CONTROL]
+# 停用某些警告 (專案特定)
+disable=
+    C0111,  # missing-docstring (允許簡單函數無docstring)
+    C0103,  # invalid-name (允許單字母變數如 x, y)
+    R0903,  # too-few-public-methods (允許簡單dataclass)
+    R0913,  # too-many-arguments (視頻配置需較多參數)
+    W0212,  # protected-access (允許測試訪問內部函數)
+    C0301,  # line-too-long (由 formatter 處理)
+
+[FORMAT]
+# 最大行長度
+max-line-length=100
+
+# 縮排字串
+indent-string='    '
+
+[DESIGN]
+# 最大本地變數數量
+max-locals=20
+
+# 最大分支數量
+max-branches=15
+
+[TYPECHECK]
+# 忽略某些成員檢查錯誤 (MoviePy 動態屬性)
+ignored-modules=moviepy,moviepy.editor
+
+[SIMILARITIES]
+# 最小重複行數才報告
+min-similarity-lines=10

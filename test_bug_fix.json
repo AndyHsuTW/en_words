@@ -1,0 +1,20 @@
+[
+  {
+    "letters": "A a",
+    "word_en": "Arm",
+    "word_zh": "手臂",
+    "image_path": "assets/arm.mp4",
+    "music_path": "assets/arm_60s.mp3",
+    "countdown_sec": 2,
+    "reveal_hold_sec": 1
+  },
+  {
+    "letters": "C c",
+    "word_en": "Cat",
+    "word_zh": "貓",
+    "image_path": "assets/cat_60s.mp3",
+    "music_path": "assets/cat_60s.mp3",
+    "countdown_sec": 2,
+    "reveal_hold_sec": 1
+  }
+]

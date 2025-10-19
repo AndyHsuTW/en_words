@@ -1,0 +1,97 @@
+[tool.pylance]
+# Pylance (VS Code Python Language Server) 配置
+
+# 型別檢查模式
+typeCheckingMode = "basic"
+
+# 包含的路徑
+include = ["spellvid", "tests"]
+
+# 排除的路徑
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "venv",
+    "FFmpeg",
+    "out",
+    "assets"
+]
+
+# 報告缺失的匯入
+reportMissingImports = true
+
+# 報告缺失的型別提示
+reportMissingTypeStubs = false
+
+# 報告未使用的變數
+reportUnusedVariable = "warning"
+
+# 報告未使用的匯入
+reportUnusedImport = "warning"
+
+[tool.mypy]
+# MyPy 靜態型別檢查配置
+
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # 漸進式型別化,初期不強制
+ignore_missing_imports = true  # 忽略第三方套件缺少 stubs
+
+# 檢查路徑
+files = ["spellvid", "tests"]
+
+# 排除路徑
+exclude = [
+    "^tests/assets/",
+    "^FFmpeg/",
+    "^out/",
+]
+
+[tool.pytest.ini_options]
+# Pytest 配置
+
+# 測試路徑
+testpaths = ["tests"]
+
+# 測試檔案模式
+python_files = ["test_*.py", "*_test.py"]
+
+# 測試函數模式
+python_functions = ["test_*"]
+
+# 額外的 pytest 選項
+addopts = [
+    "-v",  # verbose
+    "--strict-markers",  # 嚴格的標記模式
+    "--tb=short",  # 簡短的錯誤追蹤
+]
+
+# 標記定義
+markers = [
+    "unit: Unit tests (fast, no I/O)",
+    "contract: Contract tests (interface validation)",
+    "integration: Integration tests (multiple modules)",
+    "e2e: End-to-end tests (full workflow)",
+    "slow: Slow tests (may take >1 second)",
+]
+
+[tool.coverage.run]
+# Coverage 配置
+
+source = ["spellvid"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+# Coverage 報告配置
+
+precision = 2
+show_missing = true
+skip_covered = false
+
+# 覆蓋率目標
+fail_under = 85

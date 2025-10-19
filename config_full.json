@@ -1,0 +1,102 @@
+[
+	{
+		"letters": "Aa",
+		"word_en": "Arm",
+		"word_zh": "手臂",
+		"image_path": "assets/arm.mp4",
+		"music_path": "assets/arm_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 8,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Aa",
+		"word_en": "Animal",
+		"word_zh": "動物",
+		"image_path": "assets/animal.mp4",
+		"music_path": "assets/animal_20s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 3,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Bb",
+		"word_en": "Ball",
+		"word_zh": "球",
+		"image_path": "assets/ball.mp4",
+		"music_path": "assets/ball_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 8,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Bb",
+		"word_en": "Boat",
+		"word_zh": "船",
+		"image_path": "assets/boat.mp4",
+		"music_path": "assets/Boat_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 7,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Bb",
+		"word_en": "Book",
+		"word_zh": "書",
+		"image_path": "assets/book.mp4",
+		"music_path": "assets/book_60S.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 7,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Bb",
+		"word_en": "Box",
+		"word_zh": "盒子",
+		"image_path": "assets/box.mp4",
+		"music_path": "assets/box_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 8,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Cc",
+		"word_en": "Car",
+		"word_zh": "車",
+		"image_path": "assets/car.mp4",
+		"music_path": "assets/car_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 8,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Cc",
+		"word_en": "Cat",
+		"word_zh": "貓",
+		"image_path": "assets/cat.mp4",
+		"music_path": "assets/cat_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 8,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Dd",
+		"word_en": "Dog",
+		"word_zh": "狗",
+		"image_path": "assets/dog.mp4",
+		"music_path": "assets/dog_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 8,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Dd",
+		"word_en": "Duck",
+		"word_zh": "鴨",
+		"image_path": "assets/duck.mp4",
+		"music_path": "assets/duck_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 7,
+		"video_mode": "cover"
+	}
+]

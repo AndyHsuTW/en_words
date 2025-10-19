@@ -2,22 +2,20 @@
 
 Example: python scripts/render_example.py --use-moviepy
 """
+from spellvid.utils import render_video_stub
 import argparse
 import os
 import sys
 import json
-import importlib.util
 import tempfile
 import shutil
 import subprocess
 
-# load spellvid.utils by path to avoid import issues when running from scripts/
+# Add repo root to path for imports
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-utils_path = os.path.join(ROOT, 'spellvid', 'utils.py')
-spec = importlib.util.spec_from_file_location('spellvid.utils', utils_path)
-utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)  # type: ignore
-render_video_stub = utils.render_video_stub
+sys.path.insert(0, ROOT)
+
+# Import using standard Python import (no longer needs importlib.util)
 
 
 parser = argparse.ArgumentParser()

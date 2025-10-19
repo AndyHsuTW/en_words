@@ -6,7 +6,13 @@
 ---
 
 ## Project Structure & Module Organization
-- `spellvid/` holds the production code: `cli.py` exposes the CLI entry point while `utils.py` manages rendering, media loading, and ffmpeg integration.
+- `spellvid/` holds the production code with modular architecture (see `.github/copilot-instructions.md` for details):
+  - `shared/` — 共用型別、常數、驗證邏輯
+  - `domain/` — 領域邏輯 (佈局、注音、效果、時間軸)
+  - `application/` — 應用服務 (視頻服務、批次處理)
+  - `infrastructure/` — 基礎設施適配器 (MoviePy、Pillow、FFmpeg)
+  - `cli/` — CLI 命令入口
+  - ⚠️ **DEPRECATED**: `utils.py` 保留為向後相容層,標記為 deprecated,將在 v2.0 移除
 - `tests/` contains pytest suites, with reusable fixtures under `tests/assets/`. Store any new golden media there, not under `assets/`.
 - `assets/` keeps shared input media used by examples; `out/` is ignored and safe for local renders.
 - `scripts/` provides diagnostic helpers (`run_tests.ps1`, `render_example.ps1`, `analyze_video_bounds.py`) and should remain lightweight. Long-form notes live in `doc/`; `.github/` stores workflow guidance.
@@ -26,8 +32,9 @@
 -- 小貼士：若使用 VS Code，確認 Pylance 已啟用並且 MCP runner 指向專案 venv（例如透過呼叫 `configure_python_environment` 或在 Pylance 的設定中選擇對應的 Python 可執行檔）。
 
 - Follow PEP 8 with 4-space indentation and `snake_case` for functions, variables, and module names; reserve CamelCase for classes.
-- Keep business logic in `spellvid.utils` and expose narrow orchestration in `spellvid.cli`.
-- Use type hints and explicit helper functions (see `spellvid/utils.py`) to keep rendering steps testable. Prefix internal helpers with `_` when scope is private.
+- Keep business logic in appropriate layer: `domain/` for pure logic, `application/` for orchestration, `infrastructure/` for framework integration. **Avoid adding new code to `utils.py`** (deprecated).
+- Use type hints and explicit helper functions to keep logic testable. Prefix internal helpers with `_` when scope is private.
+- For architecture details and file reading order, see `.github/copilot-instructions.md`.
 
 ## Testing Guidelines
 - The project relies on pytest + pytest-cov; every feature change should include or update a `test_*.py` file alongside relevant fixtures.

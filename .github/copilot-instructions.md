@@ -8,24 +8,27 @@ Purpose: Give an AI coding agent the exact, discoverable knowledge needed to con
   - Implemented in Python using MoviePy for composition and FFmpeg for encoding. Key code lives in `spellvid/`.
 
 - Important files to read first (order matters)
-  1. `spellvid/utils.py` — core helpers: layout math (`compute_layout_bboxes`), Pillow text renderer (`_make_text_imageclip`), ffmpeg detection (`_find_and_set_ffmpeg`), schema (`SCHEMA`), asset checks and small audio stubs. Many tests import internal helpers from here.
-  2. `spellvid/cli.py` — CLI entrypoints (`make`, `batch`) and argument semantics. Use this to understand expected CLI flags (e.g. `--dry-run`, `--use-moviepy`).
-  3. `config.json` — example single-item data used by examples; shows field names and paths.
-  4. `requirements-dev.txt` — canonical dependencies for development & CI (moviepy, numpy, pydub, jsonschema, opencv-python, pytest).
-  5. `tests/` — pytest suite demonstrates project patterns (headless layout checks, integration expectations). `tests/test_layout.py` shows how tests rely on internal helpers like `_make_text_imageclip` and `_mpy` being present.
-  6. `doc/` — `requirement.md` and `TDD.md` contain project intent, CLI examples, testing strategy and acceptance criteria. Good to cite for behavior expectations.
+  1. **NEW (架構重構)**: `spellvid/domain/layout.py` — 核心佈局計算邏輯 (`compute_layout_bboxes`)
+  2. **NEW**: `spellvid/application/video_service.py` — 主要視頻渲染服務 (`render_video`)
+  3. **DEPRECATED**: `spellvid/utils.py` — 向後相容層,re-export 新模組函數,將在 v2.0 移除
+  4. `spellvid/cli.py` — CLI entrypoints (`make`, `batch`) 和參數語義
+  5. `config.json` — 範例配置數據,顯示欄位名稱和路徑
+  6. `requirements-dev.txt` — 開發與 CI 的規範依賴 (moviepy, numpy, pydub, jsonschema, opencv-python, pytest)
+  7. `tests/` — pytest 套件展示專案模式 (headless 佈局檢查、整合預期)
+  8. `doc/ARCHITECTURE.md` — 新模組化架構的完整說明與遷移指南
+  9. `doc/requirement.md` 與 `doc/TDD.md` — 專案意圖、CLI 範例、測試策略與驗收標準
 
 - Big-picture architecture (short)
-  - **NEW (重構中)**: 專案正在進行架構重構(branch: `002-refactor-architecture`),將單體 `utils.py` 拆分為分層模組:
-    - `spellvid/shared/` — 共用型別、常數、驗證邏輯
-    - `spellvid/domain/` — 領域邏輯(佈局、注音、效果、計時)
-    - `spellvid/application/` — 應用服務(視頻生成、批次處理、資源檢查)
-    - `spellvid/infrastructure/` — 基礎設施適配器(MoviePy、Pillow、FFmpeg)
-    - `spellvid/cli/` — CLI 命令入口
-  - Input: JSON array (schema in `spellvid/shared/validation.py` as `SCHEMA`).
-  - Pipeline: parse JSON → validate schema → per-item layout computation (`domain.layout.compute_layout_bboxes`) → render text/image clips using Pillow + MoviePy (`infrastructure.rendering` / `infrastructure.video`) → optional audio/beep mixing → export via MoviePy which uses ffmpeg (configured by `infrastructure.media.ffmpeg_wrapper`).
-  - Output: MP4 per item, default path `out/{word_en}.mp4` (see `cli.batch` behavior).
-  - **向後相容**: `spellvid/utils.py` 保留但標記為 deprecated,re-export 新模組函數以維持測試通過。
+  - **架構重構完成** (2025-10-18): 單體 `utils.py` 已拆分為分層模組:
+    - `spellvid/shared/` — 共用型別 (`types.py`)、常數 (`constants.py`)、驗證邏輯 (`validation.py`)
+    - `spellvid/domain/` — 領域邏輯: `layout.py` (佈局計算)、`typography.py` (注音渲染)、`effects.py` (視覺效果)、`timing.py` (時間軸)
+    - `spellvid/application/` — 應用服務: `video_service.py` (視頻生成)、`batch_service.py` (批次處理)、`resource_checker.py` (資源檢查)
+    - `spellvid/infrastructure/` — 基礎設施適配器: `rendering/` (Pillow 文字渲染)、`video/` (MoviePy 整合)、`media/` (FFmpeg/音訊)
+    - `spellvid/cli/` — CLI 命令入口與參數解析
+  - Input: JSON array (schema in `spellvid/shared/validation.py` as `SCHEMA`)
+  - Pipeline: parse JSON → validate schema → per-item layout computation (`domain.layout.compute_layout_bboxes`) → render text/image clips using Pillow + MoviePy (`infrastructure.rendering` / `infrastructure.video`) → optional audio/beep mixing → export via MoviePy which uses ffmpeg (configured by `infrastructure.media.ffmpeg_wrapper`)
+  - Output: MP4 per item, default path `out/{word_en}.mp4` (see `application.batch_service` behavior)
+  - **向後相容**: `spellvid/utils.py` 保留為輕量 re-export 層,供舊測試與腳本使用,標記為 deprecated 並將在 v2.0 移除
 
 - Project-specific conventions & patterns
   - Tests may import and use internal (underscored) helpers from `spellvid.utils` (e.g. `_make_text_imageclip`) — don't rename or hide these without updating tests.

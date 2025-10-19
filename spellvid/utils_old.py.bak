@@ -1,17 +1,3 @@
-"""⚠️ DEPRECATED: spellvid.utils module
-
-This module is deprecated and will be removed in a future version.
-All functions are being migrated to the new modular architecture:
-- spellvid.shared: Types, constants, validation
-- spellvid.domain: Layout, typography, effects, timing
-- spellvid.infrastructure: MoviePy, Pillow, FFmpeg adapters
-- spellvid.application: Video service, batch service, resource checker
-- spellvid.cli: CLI commands and parsers
-
-See ARCHITECTURE.md for migration guide.
-"""
-
-import warnings
 import json
 import os
 import shutil
@@ -20,15 +6,6 @@ import tempfile
 from typing import Dict, List, Any, Tuple, Optional
 import numpy as _np
 from PIL import Image, ImageDraw, ImageFont
-
-# Issue deprecation warning
-warnings.warn(
-    "The spellvid.utils module is deprecated. "
-    "Please migrate to the new modular architecture. "
-    "See ARCHITECTURE.md for details.",
-    DeprecationWarning,
-    stacklevel=2
-)
 
 # moviepy imports are optional; try several fallbacks so utils can detect
 # moviepy whether it's packaged as `moviepy.editor` or `moviepy` module.
@@ -3672,42 +3649,3 @@ def render_video_moviepy(
         "ending_duration_sec": ending_duration_runtime,
         "total_duration_sec": total_duration_runtime,
     }
-
-# ========== Public API Definition ==========
-# Export list for backward compatibility
-__all__ = [
-    # Core rendering functions
-    'render_video_stub',
-    'render_video_moviepy',
-    'compute_layout_bboxes',
-    'check_assets',
-    'synthesize_beeps',
-    # Constants - Canvas
-    'CANVAS_WIDTH',
-    'CANVAS_HEIGHT',
-    # Constants - Progress bar
-    'PROGRESS_BAR_SAFE_X',
-    'PROGRESS_BAR_MAX_X',
-    'PROGRESS_BAR_WIDTH',
-    'PROGRESS_BAR_HEIGHT',
-    'PROGRESS_BAR_COLORS',
-    'PROGRESS_BAR_RATIOS',
-    'PROGRESS_BAR_CORNER_RADIUS',
-    # Constants - Letters
-    'LETTER_SAFE_X',
-    'LETTER_SAFE_Y',
-    'LETTER_AVAILABLE_WIDTH',
-    'LETTER_TARGET_HEIGHT',
-    'LETTER_BASE_GAP',
-    'LETTER_EXTRA_SCALE',
-    # Constants - Colors
-    'MAIN_BG_COLOR',
-    'COLOR_WHITE',
-    # Schema
-    'SCHEMA',
-    # Test helpers (internal, for testing only)
-    '_make_text_imageclip',
-    '_mpy',
-    '_HAS_MOVIEPY',
-    '_find_and_set_ffmpeg',
-]

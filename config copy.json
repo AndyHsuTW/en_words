@@ -1,0 +1,82 @@
+[
+	{
+		"letters": "Aa",
+		"word_en": "Animal",
+		"word_zh": "動物",
+		"image_path": "assets/animal.mp4",
+		"music_path": "assets/animal_20s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 25,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Bb",
+		"word_en": "Bird",
+		"word_zh": "鳥",
+		"image_path": "assets/bird.mp4",
+		"music_path": "assets/bird_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 30,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Cc",
+		"word_en": "Cat",
+		"word_zh": "貓",
+		"image_path": "assets/cat.mp4",
+		"music_path": "assets/cat_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 30,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Dd",
+		"word_en": "Dog",
+		"word_zh": "狗",
+		"image_path": "assets/dog.mp4",
+		"music_path": "assets/dog_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 30,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Dd",
+		"word_en": "Duck",
+		"word_zh": "鴨",
+		"image_path": "assets/duck.mp4",
+		"music_path": "assets/duck_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 27,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Tt",
+		"word_en": "Turtle",
+		"word_zh": "烏龜",
+		"image_path": "assets/turtle.mp4",
+		"music_path": "assets/turtle_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 23,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Ll",
+		"word_en": "Lion",
+		"word_zh": "獅子",
+		"image_path": "assets/lion.mp4",
+		"music_path": "assets/lion_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 27,
+		"video_mode": "cover"
+	},
+	{
+		"letters": "Tt",
+		"word_en": "Tiger",
+		"word_zh": "老虎",
+		"image_path": "assets/tiger.mp4",
+		"music_path": "assets/tiger_60s.mp3",
+		"countdown_sec": 10,
+		"reveal_hold_sec": 25,
+		"video_mode": "cover"
+	}
+]
