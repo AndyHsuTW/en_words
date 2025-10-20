@@ -328,3 +328,92 @@ def _calculate_zhuyin_layout(
         )
 
     return columns
+
+
+# ============================================================================
+# 字母處理輔助函數 (Letter Processing Helpers)
+# ============================================================================
+
+
+def _normalize_letters_sequence(letters: str) -> List[str]:
+    """正規化字母序列,過濾空白與空字元
+    
+    Args:
+        letters: 原始字母字串 (可能包含空格、換行等)
+    
+    Returns:
+        過濾後的字元列表
+    
+    Example:
+        >>> _normalize_letters_sequence("I  i\\n")
+        ['I', 'i']
+        >>> _normalize_letters_sequence("")
+        []
+    """
+    if not letters:
+        return []
+    seq: List[str] = []
+    for ch in letters:
+        if not ch or ch.isspace():
+            continue
+        seq.append(ch)
+    return seq
+
+
+def _letter_asset_filename(ch: str) -> Optional[str]:
+    """根據字元產生對應的素材檔名
+    
+    Args:
+        ch: 單一字元
+    
+    Returns:
+        對應的 PNG 檔名,若字元不是字母則返回 None
+    
+    Rules:
+        - 大寫字母 → "{ch}.png" (例如: "A.png")
+        - 小寫字母 → "{ch}_small.png" (例如: "a_small.png")
+        - 非字母 → None
+    
+    Example:
+        >>> _letter_asset_filename("A")
+        'A.png'
+        >>> _letter_asset_filename("z")
+        'z_small.png'
+        >>> _letter_asset_filename("1")
+        None
+    """
+    if not ch:
+        return None
+    if ch.isalpha():
+        if ch.isupper():
+            return f"{ch}.png"
+        if ch.islower():
+            return f"{ch}_small.png"
+    return None
+
+
+def _letters_missing_names(missing: List[dict]) -> List[str]:
+    """從缺失素材列表中提取檔名或字元名稱
+    
+    Args:
+        missing: 缺失素材的字典列表,每個字典包含 "filename" 或 "char" 欄位
+    
+    Returns:
+        去重後的名稱列表
+    
+    Example:
+        >>> _letters_missing_names([
+        ...     {"filename": "A.png", "char": "A"},
+        ...     {"char": "B"},
+        ...     {"filename": "A.png"}
+        ... ])
+        ['A.png', 'B']
+    """
+    names: List[str] = []
+    for entry in missing or []:
+        name = entry.get("filename") or entry.get("char")
+        if name:
+            name_str = str(name)
+            if name_str not in names:
+                names.append(name_str)
+    return names
