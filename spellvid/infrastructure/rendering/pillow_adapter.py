@@ -326,3 +326,75 @@ class PillowAdapter:
                     return str(matches[0])
 
         raise FileNotFoundError("No suitable font found on Linux")
+
+
+# ===== Migrated utility functions from utils.py =====
+
+def _find_system_font(prefer_cjk: bool, size: int):
+    """嘗試常見系統字型路徑,返回 PIL ImageFont (truetype) 或預設字型
+    
+    此函數按優先順序搜尋系統字型:
+    - Windows 字型目錄下的常見字型
+    - CJK 字型 (prefer_cjk=True): 微軟正黑體、明體、黑體、宋體
+    - 西文字型 (prefer_cjk=False): Arial、Segoe UI、Calibri、Times
+    
+    Args:
+        prefer_cjk: 是否優先使用 CJK (中日韓) 字型
+        size: 字型大小 (像素)
+    
+    Returns:
+        ImageFont: PIL ImageFont 物件
+            - 成功: TrueType 字型
+            - 失敗: 預設字型 (load_default)
+    
+    Examples:
+        >>> # 中文字型
+        >>> font = _find_system_font(prefer_cjk=True, size=48)
+        
+        >>> # 英文字型
+        >>> font = _find_system_font(prefer_cjk=False, size=32)
+    
+    Notes:
+        - 僅支援 Windows 系統路徑
+        - 跨平台支援需額外擴充
+        - 字型載入失敗時靜默回退至預設字型
+    
+    遷移自: spellvid/utils.py:677
+    遷移日期: 2025-01-20
+    """
+    import os  # Lazy import for this utility function
+    
+    candidates = []
+    if prefer_cjk:
+        # CJK 字型候選清單 (Windows)
+        candidates = [
+            r"C:\Windows\Fonts\msjh.ttf",      # Microsoft JhengHei (微軟正黑體)
+            r"C:\Windows\Fonts\msjhbd.ttf",    # Microsoft JhengHei Bold
+            r"C:\Windows\Fonts\mingliu.ttc",   # MingLiU (細明體)
+            r"C:\Windows\Fonts\simhei.ttf",    # SimHei (黑體)
+            r"C:\Windows\Fonts\simsun.ttc",    # SimSun (宋體)
+        ]
+    else:
+        # 西文字型候選清單 (Windows)
+        candidates = [
+            r"C:\Windows\Fonts\arial.ttf",     # Arial
+            r"C:\Windows\Fonts\segoeui.ttf",   # Segoe UI
+            r"C:\Windows\Fonts\calibri.ttf",   # Calibri
+            r"C:\Windows\Fonts\times.ttf",     # Times New Roman
+        ]
+    
+    # 嘗試載入第一個存在的字型檔案
+    for p in candidates:
+        try:
+            if os.path.isfile(p):
+                return ImageFont.truetype(p, size)
+        except Exception:
+            # 字型載入失敗,嘗試下一個
+            continue
+    
+    # 所有字型都失敗,使用預設字型
+    try:
+        return ImageFont.load_default()
+    except Exception:
+        # 極端情況: 預設字型也失敗
+        return ImageFont.load_default()

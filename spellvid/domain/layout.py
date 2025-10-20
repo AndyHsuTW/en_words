@@ -553,17 +553,17 @@ def _calculate_letter_layout(
     safe_x: int,
 ) -> Dict[str, Any]:
     """計算字母圖片的佈局位置與尺寸
-    
+
     根據提供的圖片規格(已知尺寸),計算每個字母在畫布上的最終位置、
     尺寸和縮放比例。此函數純粹進行數學計算,不涉及檔案讀取或圖像操作。
-    
+
     計算邏輯:
     1. 根據目標高度計算基礎縮放比例
     2. 計算所有字母的總寬度(含間距)
     3. 若總寬度超過可用寬度,計算調整係數
     4. 為每個字母計算最終位置與尺寸
     5. 確保所有字母不超出安全區域
-    
+
     Args:
         specs: 圖片規格列表,每個元素必須包含:
             - char: 字元
@@ -576,7 +576,7 @@ def _calculate_letter_layout(
         base_gap: 基礎間距(像素,負值表示重疊)
         extra_scale: 額外縮放係數
         safe_x: 安全區域 X 偏移(像素)
-    
+
     Returns:
         佈局結果字典,包含:
         - letters: 字母佈局列表,每個元素包含:
@@ -592,7 +592,7 @@ def _calculate_letter_layout(
           - w: 總寬度(像素)
           - h: 最大高度(像素)
           - x_offset: X 偏移量(像素)
-    
+
     Examples:
         >>> specs = [
         ...     {"char": "I", "filename": "I.png", "path": "...",
@@ -610,7 +610,7 @@ def _calculate_letter_layout(
         'I'
         >>> result["bbox"]["w"] > 0
         True
-    
+
     Note:
         - 若 specs 為空,返回空佈局
         - 字母位置會自動調整以避免超出安全區域
@@ -622,65 +622,65 @@ def _calculate_letter_layout(
             "gap": 0,
             "bbox": {"w": 0, "h": 0, "x_offset": 0}
         }
-    
+
     # 階段 1: 計算基礎縮放與總寬度
     scaled: List[Dict[str, Any]] = []
     base_total_width = 0.0
-    
+
     for entry in specs:
         orig_w = max(1, entry["width"])
         orig_h = max(1, entry["height"])
-        
+
         # 基礎縮放: 使高度適配目標高度
         base_scale = min(1.0, target_height / float(orig_h))
-        
+
         scaled.append({
             **entry,
             "base_scale": base_scale,
             "orig_width": orig_w,
             "orig_height": orig_h,
         })
-        
+
         # 累加寬度 (含 extra_scale)
         base_total_width += orig_w * base_scale * extra_scale
-    
+
     # 添加間距
     base_total_width += base_gap * extra_scale * max(0, len(scaled) - 1)
-    
+
     # 階段 2: 計算調整係數(若超出可用寬度)
     adjust = 1.0
     if base_total_width > available_width and base_total_width > 0:
         adjust = available_width / base_total_width
-    
+
     # 階段 3: 計算實際間距
     gap_px = 0
     if len(scaled) > 1:
         gap_px = int(round(base_gap * extra_scale * adjust))
-    
+
     # 階段 4: 計算每個字母的最終位置與尺寸
     cursor = 0
     layout: List[Dict[str, Any]] = []
     max_height = 0
     min_x = None
-    
+
     for idx, entry in enumerate(scaled):
         base_scale = entry["base_scale"]
         orig_w = entry["orig_width"]
         orig_h = entry["orig_height"]
-        
+
         # 計算最終縮放
         pre_extra_scale = base_scale * adjust
         orig_width_after_adjust = orig_w * pre_extra_scale
         final_scale = pre_extra_scale * extra_scale
-        
+
         # 計算最終尺寸
         width_px = max(1, int(round(orig_w * final_scale)))
         height_px = max(1, int(round(orig_h * final_scale)))
-        
+
         # 計算 X 位置 (向左延伸一半寬度,實現居中效果)
         extend_left = int(round(orig_width_after_adjust * 0.5))
         new_x = cursor - extend_left
-        
+
         layout_entry = {
             "char": entry["char"],
             "filename": entry["filename"],
@@ -691,22 +691,22 @@ def _calculate_letter_layout(
             "x": new_x,
         }
         layout.append(layout_entry)
-        
+
         # 追蹤最小 X 與最大高度
         if min_x is None or new_x < min_x:
             min_x = new_x
-        
+
         cursor += width_px
         if idx < len(scaled) - 1:
             cursor += gap_px
-        
+
         if height_px > max_height:
             max_height = height_px
-    
+
     # 階段 5: 確保不超出安全區域 (左側)
     if min_x is None:
         min_x = 0
-    
+
     min_screen_x = safe_x + min_x
     if min_screen_x < 0:
         # 需要向右平移
@@ -714,19 +714,19 @@ def _calculate_letter_layout(
         for entry in layout:
             entry["x"] += shift
         min_x += shift
-    
+
     # 階段 6: 計算總寬度
     total_width = 0
     for entry in layout:
         total_width = max(total_width, entry["x"] + entry["width"])
-    
+
     # 返回完整佈局
     bbox = {
         "w": int(total_width),
         "h": max_height,
         "x_offset": int(min_x)
     }
-    
+
     return {
         "letters": layout,
         "gap": gap_px,

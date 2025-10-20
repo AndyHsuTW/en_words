@@ -326,18 +326,18 @@ def _letter_asset_filename(ch: str) -> Optional[str]:
 
 def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
     """規劃字母圖片的佈局 (向後兼容層)
-    
+
     此函數是重構後的向後兼容層,內部呼叫分層後的新函數:
     - infrastructure.rendering.image_loader: 載入圖片資訊
     - domain.layout: 計算佈局
-    
+
     Note:
         此函數將在 v2.0 移除,請改用新的分層 API
-    
+
     Args:
         letters: 字母字串
         asset_dir: 素材目錄路徑
-    
+
     Returns:
         佈局結果字典,包含 letters, missing, gap, bbox
     """
@@ -345,10 +345,10 @@ def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
         _load_letter_image_specs
     )
     from spellvid.domain.layout import _calculate_letter_layout
-    
+
     # Step 1: 載入圖片規格
     specs, missing = _load_letter_image_specs(letters, asset_dir)
-    
+
     # Step 2: 若無可用圖片,返回空結果
     if not specs:
         return {
@@ -357,7 +357,7 @@ def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
             "gap": 0,
             "bbox": {"w": 0, "h": 0}
         }
-    
+
     # Step 3: 計算佈局
     result = _calculate_letter_layout(
         specs,
@@ -367,7 +367,7 @@ def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
         extra_scale=LETTER_EXTRA_SCALE,
         safe_x=LETTER_SAFE_X,
     )
-    
+
     # Step 4: 添加 missing 資訊並返回
     result["missing"] = missing
     return result
@@ -675,35 +675,17 @@ def _measure_text_with_pil(text: str, pil_font: ImageFont.ImageFont):
 
 
 def _find_system_font(prefer_cjk: bool, size: int):
-    """Try common system font paths; return PIL ImageFont (truetype)
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+    
+    已遷移至: spellvid.infrastructure.rendering.pillow_adapter._find_system_font
+    
+    Try common system font paths; return PIL ImageFont (truetype)
     or load_default.
     """
-    candidates = []
-    if prefer_cjk:
-        candidates = [
-            r"C:\Windows\Fonts\msjh.ttf",
-            r"C:\Windows\Fonts\msjhbd.ttf",
-            r"C:\Windows\Fonts\mingliu.ttc",
-            r"C:\Windows\Fonts\simhei.ttf",
-            r"C:\Windows\Fonts\simsun.ttc",
-        ]
-    else:
-        candidates = [
-            r"C:\Windows\Fonts\arial.ttf",
-            r"C:\Windows\Fonts\segoeui.ttf",
-            r"C:\Windows\Fonts\calibri.ttf",
-            r"C:\Windows\Fonts\times.ttf",
-        ]
-    for p in candidates:
-        try:
-            if os.path.isfile(p):
-                return ImageFont.truetype(p, size)
-        except Exception:
-            continue
-    try:
-        return ImageFont.load_default()
-    except Exception:
-        return ImageFont.load_default()
+    from spellvid.infrastructure.rendering.pillow_adapter import (
+        _find_system_font as _migrated_find_system_font
+    )
+    return _migrated_find_system_font(prefer_cjk, size)
 
 
 def _make_text_imageclip(
@@ -3586,6 +3568,7 @@ def render_video_moviepy(
         "ending_duration_sec": ending_duration_runtime,
         "total_duration_sec": total_duration_runtime,
     }
+
 
 # ========== Public API Definition ==========
 # Export list for backward compatibility

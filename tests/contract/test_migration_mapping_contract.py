@@ -101,7 +101,7 @@ def test_new_location_path_valid(mapping_data: List[Dict[str, Any]]):
     new_location 必須:
     1. 符合格式 spellvid/(domain|infrastructure|application|shared)/*.py
     2. 對應的檔案存在 (或目錄存在以便建立)
-    
+
     特例:
     - "N/A": 假陽性或不遷移的函數
     - "spellvid/utils.py": 保留為向後相容層的函數
@@ -278,4 +278,3 @@ def test_migrated_functions_importable(mapping_data: List[Dict[str, Any]]):
     print(f"\nImport 驗證 (抽樣):")
     print(f"  抽樣數量: {sample_size}/{len(valid_functions)}")
     print(f"  Import 成功: {sample_size}")
-
