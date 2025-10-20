@@ -188,3 +188,76 @@ def calculate_timer_updates(
         current_time += update_interval
 
     return updates
+
+
+# ========== 內部工具函數 (從 utils.py 遷移) ==========
+
+
+def _coerce_non_negative_float(value: Any, default: float = 0.0) -> float:
+    """強制轉換為非負浮點數
+
+    Args:
+        value: 要轉換的值
+        default: 轉換失敗時的預設值
+
+    Returns:
+        非負浮點數
+
+    Examples:
+        >>> _coerce_non_negative_float("5.5")
+        5.5
+        >>> _coerce_non_negative_float(-1.0)
+        0.0
+        >>> _coerce_non_negative_float("invalid", default=1.0)
+        1.0
+    """
+    try:
+        fv = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if fv < 0:
+        return 0.0
+    if not (fv < float("inf")):
+        return float(default)
+    return float(fv)
+
+
+def _coerce_bool(value: Any, default: bool = True) -> bool:
+    """強制轉換為布林值,支援常見的字串/整數表示
+
+    Args:
+        value: 要轉換的值
+        default: 轉換失敗時的預設值
+
+    Returns:
+        布林值
+
+    Examples:
+        >>> _coerce_bool("true")
+        True
+        >>> _coerce_bool("false")
+        False
+        >>> _coerce_bool(1)
+        True
+        >>> _coerce_bool(0)
+        False
+        >>> _coerce_bool("yes")
+        True
+        >>> _coerce_bool(None)
+        True
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if not val:
+            return default
+        if val in {"false", "0", "off", "no", "n"}:
+            return False
+        if val in {"true", "1", "on", "yes", "y"}:
+            return True
+    return bool(value)
