@@ -207,20 +207,20 @@ def validate_effect_duration(duration: float, clip_duration: Optional[float] = N
 
 def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
     """計算進度條顏色帶的像素範圍佈局
-    
+
     根據預設的顏色帶比例 (PROGRESS_BAR_RATIOS),計算每個顏色帶在進度條中的
     起始與結束像素位置。顏色帶順序為: safe (綠) → warn (黃) → danger (紅)
-    
+
     Args:
         bar_width: 進度條總寬度(像素)
-    
+
     Returns:
         顏色帶佈局列表,每個元素包含:
         - name: 顏色帶名稱 ("safe", "warn", "danger")
         - color: RGB 顏色元組 (from PROGRESS_BAR_COLORS)
         - start: 起始 X 座標(像素)
         - end: 結束 X 座標(像素)
-    
+
     Examples:
         >>> layout = _progress_bar_band_layout(1792)
         >>> len(layout)
@@ -233,7 +233,7 @@ def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
         'danger'
         >>> layout[-1]["end"]
         1792
-    
+
     Note:
         - 最後一個顏色帶的 end 總是等於 bar_width,確保覆蓋整個進度條
         - 使用四捨五入避免浮點數誤差
@@ -241,7 +241,7 @@ def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
     order = ("safe", "warn", "danger")
     layout: List[Dict[str, Any]] = []
     cursor = 0
-    
+
     for idx, key in enumerate(order):
         if idx == len(order) - 1:
             # 最後一個顏色帶延伸到進度條末端
@@ -250,10 +250,10 @@ def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
             # 根據比例計算寬度
             width = int(round(bar_width * PROGRESS_BAR_RATIOS[key]))
             end = min(bar_width, cursor + width)
-        
+
         # 確保 end >= cursor
         end = max(cursor, end)
-        
+
         layout.append(
             {
                 "name": key,
@@ -263,11 +263,11 @@ def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
             }
         )
         cursor = end
-    
+
     # 確保最後一個顏色帶延伸到進度條末端
     if layout:
         layout[-1]["end"] = bar_width
-    
+
     return layout
 
 
@@ -279,16 +279,16 @@ def _build_progress_bar_segments(
     bar_width: int = PROGRESS_BAR_WIDTH,
 ) -> List[Dict[str, Any]]:
     """規劃倒數計時中進度條的各個時間分段
-    
+
     將倒數計時分割為多個時間段,計算每個時間段內進度條應顯示的寬度、位置、
     以及顏色區段。進度條從右向左縮減(倒數效果)。
-    
+
     Args:
         countdown: 倒數時長(秒)
         total_duration: 視頻總時長(秒),應 >= countdown
         fps: 進度條更新頻率(幀/秒),預設 10fps
         bar_width: 進度條總寬度(像素),預設 PROGRESS_BAR_WIDTH
-    
+
     Returns:
         時間分段列表,每個元素包含:
         - start: 分段起始時間(秒)
@@ -297,10 +297,10 @@ def _build_progress_bar_segments(
         - x_start: 進度條起始 X 座標(像素)
         - color_spans: 該分段內的顏色區段列表
         - corner_radius: 圓角半徑(像素)
-        
+
         若 countdown=0,返回單一分段(寬度為 0)
         若 fps<=0 或 bar_width<=0,返回空列表
-    
+
     Examples:
         >>> # 10 秒倒數,10fps
         >>> segments = _build_progress_bar_segments(
@@ -308,19 +308,19 @@ def _build_progress_bar_segments(
         ... )
         >>> len(segments)
         101  # 100 個倒數分段 + 1 個結束分段
-        
+
         >>> # 第一個分段(倒數開始,進度條滿)
         >>> segments[0]["start"]
         0.0
         >>> segments[0]["width"]
         1792  # 假設 PROGRESS_BAR_WIDTH=1792
-        
+
         >>> # 最後一個分段(倒數結束後)
         >>> segments[-1]["start"]
         10.0
         >>> segments[-1]["width"]
         0
-        
+
         >>> # 無倒數
         >>> segments = _build_progress_bar_segments(
         ...     countdown=0.0, total_duration=5.0
@@ -329,7 +329,7 @@ def _build_progress_bar_segments(
         1
         >>> segments[0]["width"]
         0
-    
+
     Note:
         - 進度條從右向左縮減(x_start 增加,width 減少)
         - 每個分段的 color_spans 根據 _progress_bar_band_layout 計算
@@ -337,11 +337,11 @@ def _build_progress_bar_segments(
     """
     countdown = float(max(0.0, countdown))
     total_duration = float(max(total_duration, countdown))
-    
+
     # 參數驗證
     if fps <= 0 or bar_width <= 0:
         return []
-    
+
     # 無倒數情況:返回單一分段(進度條不顯示)
     if countdown == 0.0:
         return [
@@ -354,33 +354,33 @@ def _build_progress_bar_segments(
                 "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
             }
         ]
-    
+
     # 計算顏色帶佈局
     layout = _progress_bar_band_layout(bar_width)
-    
+
     # 計算分段數量與每段時長
     step_count = max(1, int(math.ceil(countdown * float(fps))))
     step = countdown / step_count
-    
+
     segments: List[Dict[str, Any]] = []
     prev_width = bar_width
-    
+
     for idx in range(step_count):
         # 計算時間範圍
         start = min(countdown, idx * step)
         end = min(countdown, (idx + 1) * step)
-        
+
         if end <= start:
             continue
-        
+
         # 計算剩餘時間比例
         remaining = max(0.0, countdown - start)
         ratio = remaining / countdown if countdown else 0.0
-        
+
         # 計算進度條寬度
         raw_width = int(round(bar_width * ratio))
         visible_width = min(prev_width, max(0, raw_width))
-        
+
         # 確保進度條不會突然出現/消失
         if ratio > 0.0:
             if prev_width > 0:
@@ -389,21 +389,21 @@ def _build_progress_bar_segments(
                 visible_width = 0
         else:
             visible_width = 0
-        
+
         # 計算 X 起始位置(從右向左縮減)
         x_start = bar_width - visible_width if visible_width > 0 else bar_width
-        
+
         # 計算該分段內的顏色區段
         color_spans: List[Dict[str, Any]] = []
         if visible_width > 0:
             span_start = x_start
             span_end = x_start + visible_width
-            
+
             for band in layout:
                 # 計算顏色帶與進度條的重疊區域
                 overlap_start = max(span_start, band["start"])
                 overlap_end = min(span_end, band["end"])
-                
+
                 if overlap_end > overlap_start:
                     color_spans.append(
                         {
@@ -412,7 +412,7 @@ def _build_progress_bar_segments(
                             "end": int(overlap_end),
                         }
                     )
-        
+
         segments.append(
             {
                 "start": round(float(start), 6),
@@ -424,7 +424,7 @@ def _build_progress_bar_segments(
             }
         )
         prev_width = visible_width
-    
+
     # 追加倒數結束後的分段
     segments.append(
         {
@@ -436,5 +436,5 @@ def _build_progress_bar_segments(
             "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
         }
     )
-    
+
     return segments

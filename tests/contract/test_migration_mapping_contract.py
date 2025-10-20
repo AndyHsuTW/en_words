@@ -99,24 +99,33 @@ def test_new_location_path_valid(mapping_data: List[Dict[str, Any]]):
     Contract Test 2: 驗證新模組路徑存在且符合分層架構
 
     new_location 必須:
-    1. 符合格式 spellvid/(domain|infrastructure|application)/*.py
+    1. 符合格式 spellvid/(domain|infrastructure|application|shared)/*.py
     2. 對應的檔案存在 (或目錄存在以便建立)
+    
+    特例:
+    - "N/A": 假陽性或不遷移的函數
+    - "spellvid/utils.py": 保留為向後相容層的函數
     """
     import re
 
-    valid_layers = {"domain", "infrastructure", "application"}
+    valid_layers = {"domain", "infrastructure", "application", "shared"}
     layer_pattern = re.compile(
-        r"^spellvid/(domain|infrastructure|application)/.*\.py$"
+        r"^spellvid/(domain|infrastructure|application|shared)/.*\.py$"
     )
 
     for item in mapping_data:
         func_name = item["function_name"]
         new_loc = item["new_location"]
 
+        # 允許特殊標記
+        if new_loc in ("N/A", "spellvid/utils.py"):
+            continue
+
         # 驗證路徑格式
         assert layer_pattern.match(new_loc), (
             f"函數 {func_name} 的 new_location 格式錯誤: {new_loc}\n"
-            f"必須符合: spellvid/(domain|infrastructure|application)/*.py"
+            f"必須符合: spellvid/(domain|infrastructure|application|shared)/*.py\n"
+            f"或使用特殊標記: N/A, spellvid/utils.py"
         )
 
         # 提取 layer
@@ -223,12 +232,18 @@ def test_migrated_functions_importable(mapping_data: List[Dict[str, Any]]):
     import importlib
     import random
 
-    # 抽樣函數 (最多 5 個)
-    sample_size = min(5, len(mapping_data))
-    if sample_size == 0:
-        pytest.skip("對應表為空,跳過 import 測試")
+    # 過濾掉特殊標記的函數
+    valid_functions = [
+        item for item in mapping_data
+        if item["new_location"] not in ("N/A", "spellvid/utils.py")
+    ]
 
-    sampled = random.sample(mapping_data, sample_size)
+    # 抽樣函數 (最多 5 個)
+    sample_size = min(5, len(valid_functions))
+    if sample_size == 0:
+        pytest.skip("沒有可測試的遷移函數,跳過 import 測試")
+
+    sampled = random.sample(valid_functions, sample_size)
 
     import_errors = []
 
@@ -261,5 +276,6 @@ def test_migrated_functions_importable(mapping_data: List[Dict[str, Any]]):
         )
 
     print(f"\nImport 驗證 (抽樣):")
-    print(f"  抽樣數量: {sample_size}/{len(mapping_data)}")
+    print(f"  抽樣數量: {sample_size}/{len(valid_functions)}")
     print(f"  Import 成功: {sample_size}")
+

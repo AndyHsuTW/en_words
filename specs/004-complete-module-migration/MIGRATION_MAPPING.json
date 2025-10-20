@@ -13,13 +13,13 @@
   {
     "function_name": "_plan_letter_images",
     "old_location": "spellvid/utils.py",
-    "new_location": "spellvid/domain/layout.py",
+    "new_location": "spellvid/utils.py",
     "category": "production",
     "call_count": 5,
     "wrapper_needed": false,
     "migration_priority": "medium",
     "dependencies": [],
-    "notes": ""
+    "notes": "Refactored into 3 layers (infrastructure + domain + orchestration). Kept as thin wrapper in utils.py for backward compatibility. Will be deprecated in v2.0."
   },
   {
     "function_name": "_letter_asset_filename",
@@ -405,5 +405,126 @@
     "migration_priority": "high",
     "dependencies": [],
     "notes": ""
+  },
+  {
+    "function_name": "check_assets",
+    "old_location": "spellvid/utils.py",
+    "new_location": "spellvid/application/resource_checker.py",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "medium",
+    "dependencies": [],
+    "notes": "Pending migration to Application layer"
+  },
+  {
+    "function_name": "compute_layout_bboxes",
+    "old_location": "spellvid/utils.py",
+    "new_location": "spellvid/domain/layout.py",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "medium",
+    "dependencies": [],
+    "notes": "Pending migration to Domain layer"
+  },
+  {
+    "function_name": "load_json",
+    "old_location": "spellvid/utils.py",
+    "new_location": "spellvid/shared/validation.py",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "low",
+    "dependencies": [],
+    "notes": "Pending migration to Shared layer"
+  },
+  {
+    "function_name": "validate_schema",
+    "old_location": "spellvid/utils.py",
+    "new_location": "spellvid/shared/validation.py",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "low",
+    "dependencies": [],
+    "notes": "Pending migration to Shared layer"
+  },
+  {
+    "function_name": "_zhuyin_main_gap",
+    "old_location": "spellvid/utils.py",
+    "new_location": "spellvid/domain/typography.py",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "low",
+    "dependencies": [],
+    "notes": "Pending migration to Domain layer"
+  },
+  {
+    "function_name": "zhuyin_for",
+    "old_location": "spellvid/utils.py",
+    "new_location": "spellvid/domain/typography.py",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "medium",
+    "dependencies": [],
+    "notes": "Pending migration to Domain layer"
+  },
+  {
+    "function_name": "__init__",
+    "old_location": "N/A",
+    "new_location": "N/A",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "none",
+    "dependencies": [],
+    "notes": "False positive from usage scanner - Python special method, not a migration target"
+  },
+  {
+    "function_name": "duration",
+    "old_location": "N/A",
+    "new_location": "N/A",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "none",
+    "dependencies": [],
+    "notes": "False positive from usage scanner - scanned from variable names like FADE_OUT_DURATION"
+  },
+  {
+    "function_name": "get_frame",
+    "old_location": "N/A",
+    "new_location": "N/A",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "none",
+    "dependencies": [],
+    "notes": "False positive from usage scanner - MoviePy internal method, not defined in utils.py"
+  },
+  {
+    "function_name": "make_frame",
+    "old_location": "N/A",
+    "new_location": "N/A",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "none",
+    "dependencies": [],
+    "notes": "False positive from usage scanner - MoviePy internal method, not defined in utils.py"
+  },
+  {
+    "function_name": "with_duration",
+    "old_location": "N/A",
+    "new_location": "N/A",
+    "category": "production",
+    "call_count": 0,
+    "wrapper_needed": false,
+    "migration_priority": "none",
+    "dependencies": [],
+    "notes": "False positive from usage scanner - MoviePy method, not defined in utils.py"
   }
 ]

@@ -325,138 +325,52 @@ def _letter_asset_filename(ch: str) -> Optional[str]:
 
 
 def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
-    seq = _normalize_letters_sequence(letters)
-    missing: List[Dict[str, Any]] = []
-    planned: List[Dict[str, Any]] = []
-    if not seq:
-        return {"letters": [], "missing": missing, "gap": 0, "bbox": {"w": 0, "h": 0}}
-
-    for ch in seq:
-        fname = _letter_asset_filename(ch)
-        if not fname:
-            missing.append({
-                "char": ch,
-                "filename": None,
-                "path": None,
-                "reason": "unsupported",
-            })
-            continue
-        path_str = os.path.join(asset_dir, fname)
-        if not os.path.isfile(path_str):
-            missing.append({
-                "char": ch,
-                "filename": fname,
-                "path": path_str,
-                "reason": "missing",
-            })
-            continue
-        try:
-            with Image.open(path_str) as img:
-                orig_w, orig_h = img.size
-        except Exception as exc:
-            missing.append({
-                "char": ch,
-                "filename": fname,
-                "path": path_str,
-                "reason": "unreadable",
-                "error": str(exc),
-            })
-            continue
-        planned.append({
-            "char": ch,
-            "filename": fname,
-            "path": path_str,
-            "orig_width": int(orig_w),
-            "orig_height": int(orig_h),
-        })
-
-    if not planned:
-        return {"letters": [], "missing": missing, "gap": 0, "bbox": {"w": 0, "h": 0}}
-
-    base_gap = LETTER_BASE_GAP
-    avail_width = LETTER_AVAILABLE_WIDTH
-    target_height = LETTER_TARGET_HEIGHT
-
-    scaled: List[Dict[str, Any]] = []
-    base_total_width = 0.0
-    for entry in planned:
-        orig_w = max(1, entry["orig_width"])
-        orig_h = max(1, entry["orig_height"])
-        base_scale = min(1.0, target_height / float(orig_h))
-        scaled.append(
-            {
-                **entry,
-                "base_scale": base_scale,
-                "orig_width": orig_w,
-                "orig_height": orig_h,
-            }
-        )
-        base_total_width += orig_w * base_scale * LETTER_EXTRA_SCALE
-
-    base_total_width += base_gap * LETTER_EXTRA_SCALE * max(0, len(scaled) - 1)
-
-    adjust = 1.0
-    if base_total_width > avail_width and base_total_width > 0:
-        adjust = avail_width / base_total_width
-
-    gap_px = 0
-    if len(scaled) > 1:
-        gap_px = int(round(base_gap * LETTER_EXTRA_SCALE * adjust))
-
-    cursor = 0
-    layout: List[Dict[str, Any]] = []
-    max_height = 0
-    min_x = None
-
-    for idx, entry in enumerate(scaled):
-        base_scale = entry["base_scale"]
-        orig_w = entry["orig_width"]
-        orig_h = entry["orig_height"]
-
-        pre_extra_scale = base_scale * adjust
-        orig_width_after_adjust = orig_w * pre_extra_scale
-        final_scale = pre_extra_scale * LETTER_EXTRA_SCALE
-
-        width_px = max(1, int(round(orig_w * final_scale)))
-        height_px = max(1, int(round(orig_h * final_scale)))
-        extend_left = int(round(orig_width_after_adjust * 0.5))
-        new_x = cursor - extend_left
-
-        layout_entry = {
-            "char": entry["char"],
-            "filename": entry["filename"],
-            "path": entry["path"],
-            "width": width_px,
-            "height": height_px,
-            "scale": final_scale,
-            "x": new_x,
+    """規劃字母圖片的佈局 (向後兼容層)
+    
+    此函數是重構後的向後兼容層,內部呼叫分層後的新函數:
+    - infrastructure.rendering.image_loader: 載入圖片資訊
+    - domain.layout: 計算佈局
+    
+    Note:
+        此函數將在 v2.0 移除,請改用新的分層 API
+    
+    Args:
+        letters: 字母字串
+        asset_dir: 素材目錄路徑
+    
+    Returns:
+        佈局結果字典,包含 letters, missing, gap, bbox
+    """
+    from spellvid.infrastructure.rendering.image_loader import (
+        _load_letter_image_specs
+    )
+    from spellvid.domain.layout import _calculate_letter_layout
+    
+    # Step 1: 載入圖片規格
+    specs, missing = _load_letter_image_specs(letters, asset_dir)
+    
+    # Step 2: 若無可用圖片,返回空結果
+    if not specs:
+        return {
+            "letters": [],
+            "missing": missing,
+            "gap": 0,
+            "bbox": {"w": 0, "h": 0}
         }
-        layout.append(layout_entry)
-
-        if min_x is None or new_x < min_x:
-            min_x = new_x
-
-        cursor += width_px
-        if idx < len(scaled) - 1:
-            cursor += gap_px
-        if height_px > max_height:
-            max_height = height_px
-
-    if min_x is None:
-        min_x = 0
-    min_screen_x = LETTER_SAFE_X + min_x
-    if min_screen_x < 0:
-        shift = -min_screen_x
-        for entry in layout:
-            entry["x"] += shift
-        min_x += shift
-
-    total_width = 0
-    for entry in layout:
-        total_width = max(total_width, entry["x"] + entry["width"])
-
-    bbox = {"w": int(total_width), "h": max_height, "x_offset": int(min_x)}
-    return {"letters": layout, "missing": missing, "gap": gap_px, "bbox": bbox}
+    
+    # Step 3: 計算佈局
+    result = _calculate_letter_layout(
+        specs,
+        target_height=LETTER_TARGET_HEIGHT,
+        available_width=LETTER_AVAILABLE_WIDTH,
+        base_gap=LETTER_BASE_GAP,
+        extra_scale=LETTER_EXTRA_SCALE,
+        safe_x=LETTER_SAFE_X,
+    )
+    
+    # Step 4: 添加 missing 資訊並返回
+    result["missing"] = missing
+    return result
 
 
 def _letters_missing_names(missing: List[Dict[str, Any]]) -> List[str]:
