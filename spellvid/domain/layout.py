@@ -20,7 +20,7 @@
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from spellvid.shared.types import LayoutBox, VideoConfig
 from spellvid.shared.constants import (
@@ -337,13 +337,13 @@ def _calculate_zhuyin_layout(
 
 def _normalize_letters_sequence(letters: str) -> List[str]:
     """正規化字母序列,過濾空白與空字元
-    
+
     Args:
         letters: 原始字母字串 (可能包含空格、換行等)
-    
+
     Returns:
         過濾後的字元列表
-    
+
     Example:
         >>> _normalize_letters_sequence("I  i\\n")
         ['I', 'i']
@@ -362,18 +362,18 @@ def _normalize_letters_sequence(letters: str) -> List[str]:
 
 def _letter_asset_filename(ch: str) -> Optional[str]:
     """根據字元產生對應的素材檔名
-    
+
     Args:
         ch: 單一字元
-    
+
     Returns:
         對應的 PNG 檔名,若字元不是字母則返回 None
-    
+
     Rules:
         - 大寫字母 → "{ch}.png" (例如: "A.png")
         - 小寫字母 → "{ch}_small.png" (例如: "a_small.png")
         - 非字母 → None
-    
+
     Example:
         >>> _letter_asset_filename("A")
         'A.png'
@@ -394,13 +394,13 @@ def _letter_asset_filename(ch: str) -> Optional[str]:
 
 def _letters_missing_names(missing: List[dict]) -> List[str]:
     """從缺失素材列表中提取檔名或字元名稱
-    
+
     Args:
         missing: 缺失素材的字典列表,每個字典包含 "filename" 或 "char" 欄位
-    
+
     Returns:
         去重後的名稱列表
-    
+
     Example:
         >>> _letters_missing_names([
         ...     {"filename": "A.png", "char": "A"},
@@ -417,3 +417,123 @@ def _letters_missing_names(missing: List[dict]) -> List[str]:
             if name_str not in names:
                 names.append(name_str)
     return names
+
+
+# ============================================================================
+# 注音符號佈局計算 (Zhuyin Layout)
+# ============================================================================
+
+
+def _layout_zhuyin_column(
+    cursor_y: int,
+    col_h: int,
+    total_main_h: int,
+    tone_syms: List[str],
+    tone_sizes: List[Tuple[int, int]],
+    tone_gap: int = 10,
+) -> Dict[str, Any]:
+    """計算注音符號直行的垂直位置佈局
+    
+    此函數處理注音符號(聲母、韻母、介音)與聲調符號的垂直排列,
+    包含特殊處理:
+    - 輕聲(˙)置於主要符號上方,居中對齊
+    - 其他聲調置於主要符號右側,垂直置中
+    
+    Args:
+        cursor_y: 直行起始 Y 座標 (頂部)
+        col_h: 直行可用高度
+        total_main_h: 主要符號的總高度
+        tone_syms: 聲調符號列表 (例如: ["ˊ"] 或 ["˙"])
+        tone_sizes: 聲調符號的 (寬, 高) 列表
+        tone_gap: 符號間的間距 (預設 10px)
+    
+    Returns:
+        包含佈局資訊的字典:
+        - main_start_y: 主要符號起始 Y 座標
+        - tone_start_y: 聲調符號起始 Y 座標 (None 表示無聲調)
+        - tone_box_height: 聲調區域總高度
+        - tone_alignment: 聲調對齊方式 ("center" 或 "right")
+        - tone_is_neutral: 是否為輕聲
+    
+    Examples:
+        >>> # 一般聲調 (ˊ) - 置於右側垂直置中
+        >>> _layout_zhuyin_column(
+        ...     cursor_y=100, col_h=200, total_main_h=80,
+        ...     tone_syms=["ˊ"], tone_sizes=[(10, 15)]
+        ... )
+        {'main_start_y': 100, 'tone_start_y': 140, 'tone_box_height': 15,
+         'tone_alignment': 'right', 'tone_is_neutral': False}
+        
+        >>> # 輕聲 (˙) - 置於上方居中
+        >>> _layout_zhuyin_column(
+        ...     cursor_y=100, col_h=200, total_main_h=80,
+        ...     tone_syms=["˙"], tone_sizes=[(10, 12)]
+        ... )
+        {'main_start_y': 122, 'tone_start_y': 100, 'tone_box_height': 12,
+         'tone_alignment': 'center', 'tone_is_neutral': True}
+    """
+    tone_is_neutral = len(tone_syms) == 1 and tone_syms[0] == "˙"
+    top = int(cursor_y)
+    col_height = max(0, int(col_h))
+    safe_total_main_h = max(0, int(total_main_h))
+
+    # 預設主要符號從頂部開始
+    base_main_start_y = top
+    if safe_total_main_h > 0:
+        # 確保主要符號不超出可用高度
+        limit_main_start = top + col_height - safe_total_main_h
+        if limit_main_start < base_main_start_y:
+            base_main_start_y = limit_main_start
+    
+    layout: Dict[str, Any] = {
+        "main_start_y": base_main_start_y,
+        "tone_start_y": None,
+        "tone_box_height": 0,
+        "tone_alignment": "right",
+        "tone_is_neutral": tone_is_neutral,
+    }
+    
+    # 如果沒有聲調符號,直接返回
+    if not tone_syms or not tone_sizes:
+        return layout
+
+    # 計算聲調符號的總高度 (包含間距)
+    tone_total_h = 0
+    for idx, (_, height) in enumerate(tone_sizes):
+        tone_total_h += max(0, int(height))
+        if idx < len(tone_sizes) - 1:
+            tone_total_h += tone_gap
+    tone_total_h = max(0, tone_total_h)
+
+    if tone_is_neutral:
+        # 輕聲特殊處理: 置於主要符號上方,居中對齊
+        has_content = safe_total_main_h > 0 and tone_total_h > 0
+        gap_to_main = tone_gap if has_content else 0
+        block_h = safe_total_main_h + tone_total_h + gap_to_main
+        block_start_y = top
+        
+        # 整體區塊置中
+        if block_h > 0:
+            limit_block_start = top + col_height - block_h
+            if limit_block_start < block_start_y:
+                block_start_y = limit_block_start
+        
+        layout["tone_start_y"] = block_start_y
+        layout["main_start_y"] = block_start_y + tone_total_h + gap_to_main
+        layout["tone_box_height"] = tone_total_h
+        layout["tone_alignment"] = "center"
+    else:
+        # 一般聲調: 置於主要符號右側,垂直置中
+        layout["main_start_y"] = base_main_start_y
+        tone_start_y = base_main_start_y + max(0, safe_total_main_h // 2)
+        
+        # 確保聲調不超出可用高度
+        if tone_total_h > 0:
+            max_tone_start = top + col_height - tone_total_h
+            if tone_start_y > max_tone_start:
+                tone_start_y = max_tone_start
+        
+        layout["tone_start_y"] = tone_start_y
+        layout["tone_box_height"] = tone_total_h or safe_total_main_h
+
+    return layout
