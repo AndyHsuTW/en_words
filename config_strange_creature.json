@@ -20,9 +20,9 @@
 		"video_mode": "cover"
 	},
 	{
-		"letters": "Cc",
-		"word_en": "Cat",
-		"word_zh": "貓",
+		"letters": "Pp",
+		"word_en": "Pineapple spider",
+		"word_zh": "鳳梨蜘蛛",
 		"image_path": "assets/cat.mp4",
 		"music_path": "assets/cat_60s.mp3",
 		"countdown_sec": 10,
@@ -30,9 +30,9 @@
 		"video_mode": "cover"
 	},
 	{
-		"letters": "Dd",
-		"word_en": "Dog",
-		"word_zh": "狗",
+		"letters": "Aa",
+		"word_en": "Airplane alligator",
+		"word_zh": "飛機鱷魚",
 		"image_path": "assets/dog.mp4",
 		"music_path": "assets/dog_60s.mp3",
 		"countdown_sec": 10,
@@ -40,9 +40,9 @@
 		"video_mode": "cover"
 	},
 	{
-		"letters": "Dd",
-		"word_en": "Duck",
-		"word_zh": "鴨",
+		"letters": "Cc",
+		"word_en": "Cappuccino Ballerina",
+		"word_zh": "卡布奇諾芭蕾舞者",
 		"image_path": "assets/duck.mp4",
 		"music_path": "assets/duck_60s.mp3",
 		"countdown_sec": 10,

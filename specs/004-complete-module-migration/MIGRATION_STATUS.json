@@ -1,0 +1,263 @@
+{
+  "migrated": [],
+  "in_utils_only": [
+    {
+      "function_name": "_coerce_non_negative_float",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_resolve_entry_video_path",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_is_entry_enabled",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_resolve_ending_video_path",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_is_ending_enabled",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_probe_media_duration",
+      "category": "production",
+      "call_count": 6
+    },
+    {
+      "function_name": "_prepare_entry_context",
+      "category": "production",
+      "call_count": 6
+    },
+    {
+      "function_name": "_prepare_ending_context",
+      "category": "production",
+      "call_count": 6
+    },
+    {
+      "function_name": "_resolve_letter_asset_dir",
+      "category": "production",
+      "call_count": 8
+    },
+    {
+      "function_name": "_normalize_letters_sequence",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_letter_asset_filename",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_plan_letter_images",
+      "category": "production",
+      "call_count": 5
+    },
+    {
+      "function_name": "_letters_missing_names",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_prepare_letters_context",
+      "category": "production",
+      "call_count": 12
+    },
+    {
+      "function_name": "_log_missing_letter_assets",
+      "category": "production",
+      "call_count": 6
+    },
+    {
+      "function_name": "_coerce_bool",
+      "category": "production",
+      "call_count": 18
+    },
+    {
+      "function_name": "_progress_bar_band_layout",
+      "category": "production",
+      "call_count": 6
+    },
+    {
+      "function_name": "_progress_bar_base_arrays",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_make_progress_bar_mask",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_build_progress_bar_segments",
+      "category": "production",
+      "call_count": 8
+    },
+    {
+      "function_name": "_find_and_set_ffmpeg",
+      "category": "production",
+      "call_count": 5
+    },
+    {
+      "function_name": "_measure_text_with_pil",
+      "category": "production",
+      "call_count": 22
+    },
+    {
+      "function_name": "_find_system_font",
+      "category": "production",
+      "call_count": 11
+    },
+    {
+      "function_name": "_make_text_imageclip",
+      "category": "production",
+      "call_count": 50
+    },
+    {
+      "function_name": "_layout_zhuyin_column",
+      "category": "production",
+      "call_count": 7
+    },
+    {
+      "function_name": "_make_fixed_letter_clip",
+      "category": "production",
+      "call_count": 2
+    },
+    {
+      "function_name": "synthesize_beeps",
+      "category": "production",
+      "call_count": 5
+    },
+    {
+      "function_name": "_create_placeholder_mp4_with_ffmpeg",
+      "category": "production",
+      "call_count": 9
+    },
+    {
+      "function_name": "render_video_stub",
+      "category": "production",
+      "call_count": 28
+    },
+    {
+      "function_name": "_apply_fadeout",
+      "category": "production",
+      "call_count": 17
+    },
+    {
+      "function_name": "_apply_fadein",
+      "category": "production",
+      "call_count": 14
+    },
+    {
+      "function_name": "concatenate_videos_with_transitions",
+      "category": "production",
+      "call_count": 14
+    },
+    {
+      "function_name": "render_video_moviepy",
+      "category": "production",
+      "call_count": 24
+    },
+    {
+      "function_name": "make_beep",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_ensure_dimensions",
+      "category": "production",
+      "call_count": 10
+    },
+    {
+      "function_name": "_ensure_fullscreen_cover",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "_auto_letterbox_crop",
+      "category": "production",
+      "call_count": 4
+    },
+    {
+      "function_name": "get_frame",
+      "category": "production",
+      "call_count": 24
+    },
+    {
+      "function_name": "with_duration",
+      "category": "production",
+      "call_count": 52
+    },
+    {
+      "function_name": "duration",
+      "category": "production",
+      "call_count": 827
+    },
+    {
+      "function_name": "make_frame",
+      "category": "production",
+      "call_count": 4
+    }
+  ],
+  "duplicated": [
+    {
+      "function_name": "load_json",
+      "new_locations": [
+        "shared/validation.py"
+      ],
+      "category": "production"
+    },
+    {
+      "function_name": "validate_schema",
+      "new_locations": [
+        "shared/validation.py"
+      ],
+      "category": "production"
+    },
+    {
+      "function_name": "_zhuyin_main_gap",
+      "new_locations": [
+        "domain/typography.py"
+      ],
+      "category": "production"
+    },
+    {
+      "function_name": "zhuyin_for",
+      "new_locations": [
+        "domain/typography.py"
+      ],
+      "category": "production"
+    },
+    {
+      "function_name": "compute_layout_bboxes",
+      "new_locations": [
+        "domain/layout.py"
+      ],
+      "category": "production"
+    },
+    {
+      "function_name": "check_assets",
+      "new_locations": [
+        "application/resource_checker.py"
+      ],
+      "category": "production"
+    },
+    {
+      "function_name": "__init__",
+      "new_locations": [
+        "shared/validation.py",
+        "infrastructure/media/ffmpeg_wrapper.py",
+        "infrastructure/video/moviepy_adapter.py"
+      ],
+      "category": "production"
+    }
+  ]
+}

@@ -1,0 +1,1177 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.0, pytest-8.4.2, pluggy-1.6.0
+rootdir: C:\Projects\en_words
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.11.0, cov-6.3.0
+collected 213 items
+
+tests\contract\test_media_processor_contract.py ..s.ss.                  [  3%]
+tests\contract\test_text_renderer_contract.py ......                     [  6%]
+tests\contract\test_video_composer_contract.py .........                 [ 10%]
+tests\integration\test_batch_service.py .ssssss                          [ 13%]
+tests\integration\test_cli_batch.py ssssss                               [ 16%]
+tests\integration\test_cli_make.py ssssss                                [ 19%]
+tests\integration\test_video_service.py ..ssss.s                         [ 23%]
+tests\performance\test_benchmarks.py ....s.                              [ 25%]
+tests\test_batch_concatenation.py ..F.......ss                           [ 31%]
+tests\test_concat.py ..                                                  [ 32%]
+tests\test_countdown.py ...                                              [ 33%]
+tests\test_ending_video.py ..F..                                         [ 36%]
+tests\test_entry_video.py .FFs                                           [ 38%]
+tests\test_image_inclusion.py F                                          [ 38%]
+tests\test_integration.py ..F                                            [ 39%]
+tests\test_layout.py ..                                                  [ 40%]
+tests\test_letters_images.py F..                                         [ 42%]
+tests\test_music_inclusion.py ..                                         [ 43%]
+tests\test_progress_bar.py ...                                           [ 44%]
+tests\test_reveal_stable_positions.py .                                  [ 45%]
+tests\test_reveal_underline.py ..F.                                      [ 46%]
+tests\test_transition_fadeout.py ............                            [ 52%]
+tests\test_video_arm_sizing.py F.                                        [ 53%]
+tests\test_video_inclusion.py F                                          [ 53%]
+tests\test_video_mode.py FFF..                                           [ 56%]
+tests\test_video_overlap.py .                                            [ 56%]
+tests\test_zhuyin.py ....F..                                             [ 60%]
+tests\unit\domain\test_effects.py ..........                             [ 64%]
+tests\unit\domain\test_layout.py ................                        [ 72%]
+tests\unit\domain\test_timing.py ..............                          [ 78%]
+tests\unit\domain\test_typography.py ...............                     [ 85%]
+tests\unit\shared\test_types.py ................                         [ 93%]
+tests\unit\shared\test_validation.py ..............                      [100%]
+
+================================== FAILURES ===================================
+_________________________ test_concatenate_with_audio _________________________
+tests\test_batch_concatenation.py:117: in test_concatenate_with_audio
+    create_test_video(str(video1), duration=3,
+tests\test_batch_concatenation.py:43: in create_test_video
+    clip.write_videofile(path, fps=30, codec="libx264", audio_codec="aac")
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+tests\test_batch_concatenation.py:33: in <lambda>
+    lambda t: audio_array[int(t * sample_rate): int(t * sample_rate) + 1],
+                          ^^^^^^^^^^^^^^^^^^^^
+E   TypeError: only length-1 arrays can be converted to Python scalars
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_concatenate_with_audio0\video1_audio.mp4.
+MoviePy - Writing audio in video1_audioTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+chunk:   0%|          | 0/67 [00:00<?, ?it/s, now=None]
+______________________ test_moviepy_ending_no_letterbox _______________________
+tests\test_ending_video.py:128: in test_moviepy_ending_no_letterbox
+    res = utils.render_video_moviepy(item, str(out_path), dry_run=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1996,) (1996,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_moviepy_ending_no_letterb0\ending_fullscreen.mp4.
+MoviePy - Writing audio in ending_fullscreenTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+                                                                 
+
+chunk:   1%|▏         | 1/67 [01:30<1:39:03, 90.06s/it, now=None]
+                                                                 
+
+chunk:   1%|▏         | 1/67 [01:30<1:39:03, 90.06s/it, now=None]
+
+chunk:   0%|          | 0/402 [00:00<?, ?it/s, now=None][A
+
+chunk:  26%|██▌       | 105/402 [00:00<00:00, 623.60it/s, now=None][A
+___________________ test_cli_make_respects_entry_hold_flag ____________________
+tests\test_entry_video.py:170: in test_cli_make_respects_entry_hold_flag
+    payload = ast.literal_eval(captured.out.strip())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\hamow\AppData\Local\Programs\Python\Python313\Lib\ast.py:68: in literal_eval
+    node_or_string = parse(node_or_string.lstrip(" \t"), mode='eval')
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\hamow\AppData\Local\Programs\Python\Python313\Lib\ast.py:54: in parse
+    return compile(source, filename, mode, flags,
+E     File "<unknown>", line 2
+E       Duration: 20.00s
+E                     ^
+E   SyntaxError: invalid decimal literal
+_______________________ test_moviepy_entry_clip_offsets _______________________
+tests\test_entry_video.py:219: in test_moviepy_entry_clip_offsets
+    assert res["total_duration_sec"] == pytest.approx(
+E   assert 21.39 == 15.33 ± 0.7665
+E     
+E     comparison failed
+E     Obtained: 21.39
+E     Expected: 15.33 ± 0.7665
+---------------------------- Captured stdout call -----------------------------
+Wrote zh overlay debug image: C:\Projects\en_words\scripts\zh_overlay-1760757668.png
+Wrote final composite snapshot: C:\Projects\en_words\scripts\final_snapshot-1760757669.png
+________________________ test_image_included_in_render ________________________
+tests\test_image_inclusion.py:56: in test_image_included_in_render
+    res = utils.render_video_moviepy(item, str(out_mp4), dry_run=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1999,) (1999,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_image_included_in_render0\out.mp4.
+MoviePy - Writing audio in outTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+                                                                 
+
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [01:32<1:41:56, 92.67s/it, now=None]
+
+chunk:  28%|██▊       | 114/402 [00:02<00:00, 623.60it/s, now=None][A
+                                                                 
+
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [01:32<1:41:56, 92.67s/it, now=None]
+
+chunk:  28%|██▊       | 114/402 [00:02<00:00, 623.60it/s, now=None][A
+
+
+chunk:   0%|          | 0/357 [00:00<?, ?it/s, now=None][A[A
+
+
+chunk:  29%|██▉       | 105/357 [00:00<00:00, 699.90it/s, now=None][A[A
+_____________________________ test_batch_dry_run ______________________________
+tests\test_integration.py:55: in test_batch_dry_run
+    assert rc == 0
+E   assert 1 == 0
+---------------------------- Captured stderr call -----------------------------
+ERROR: Unexpected error - type object 'A' has no attribute 'letters_as_image'
+Traceback (most recent call last):
+  File "C:\Projects\en_words\spellvid\cli\commands.py", line 136, in batch_command
+    item["letters_as_image"] = args.letters_as_image
+                               ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'A' has no attribute 'letters_as_image'
+_____________________ test_letters_image_plan_uses_assets _____________________
+tests\test_letters_images.py:20: in test_letters_image_plan_uses_assets
+    assert letters_box.get("w") == 838
+E   AssertionError: assert 508 == 838
+E    +  where 508 = <built-in method get of dict object at 0x0000024604D2A7C0>('w')
+E    +    where <built-in method get of dict object at 0x0000024604D2A7C0> = {'gap': -60, 'h': 330, 'missing': [], 'mode': 'image', ...}.get
+____________________ test_reveal_underlines_drawn_in_video ____________________
+tests\test_reveal_underline.py:73: in test_reveal_underlines_drawn_in_video
+    res = sv_utils.render_video_stub(
+spellvid\utils.py:1546: in render_video_stub
+    return render_video_moviepy(
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1999,) (1999,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_reveal_underlines_drawn_i0\out.mp4.
+MoviePy - Writing audio in outTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+                                                                  
+
+
+
+                                                                   
+[A[A
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [03:13<3:32:26, 193.13s/it, now=None]
+
+
+chunk:  32%|███▏      | 114/357 [01:40<00:00, 699.90it/s, now=None][A[A
+
+chunk:  28%|██▊       | 114/402 [01:43<00:00, 623.60it/s, now=None][A
+                                                                  
+
+
+
+                                                                   
+[A[A
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [03:13<3:32:26, 193.13s/it, now=None]
+
+
+chunk:  32%|███▏      | 114/357 [01:40<00:00, 699.90it/s, now=None][A[A
+
+chunk:  28%|██▊       | 114/402 [01:43<00:00, 623.60it/s, now=None][A
+
+
+
+chunk:   0%|          | 0/357 [00:00<?, ?it/s, now=None][A[A[A
+
+
+
+chunk:  29%|██▉       | 105/357 [00:00<00:00, 614.99it/s, now=None][A[A[A
+-------------------------- Captured stderr teardown ---------------------------
+
+
+
+                                                                   [A[A
+____________________________ test_arm_video_sizing ____________________________
+tests\test_video_arm_sizing.py:67: in test_arm_video_sizing
+    assert bg_bottom <= reveal_top - margin, (
+E   AssertionError: Video bottom 874 too close to reveal top 850, need at least 8px margin
+E   assert 874 <= (850 - 8)
+---------------------------- Captured stdout call -----------------------------
+Wrote zh overlay debug image: C:\Projects\en_words\scripts\zh_overlay-1760757772.png
+Wrote zh overlay debug image: C:\Projects\en_words\scripts\zh_overlay-1760757772.png
+Wrote final composite snapshot: C:\Projects\en_words\scripts\final_snapshot-1760757773.png
+________________________ test_video_included_in_render ________________________
+tests\test_video_inclusion.py:30: in test_video_included_in_render
+    res = utils.render_video_moviepy(item, str(out_mp4), dry_run=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1996,) (1996,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_video_included_in_render0\out.mp4.
+MoviePy - Writing audio in outTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+                                                                  
+
+
+
+
+                                                                   
+[A[A[A
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [03:19<3:39:26, 199.49s/it, now=None]
+
+
+
+chunk:  32%|███▏      | 114/357 [00:06<00:00, 614.99it/s, now=None][A[A[A
+
+chunk:  28%|██▊       | 114/402 [01:49<00:00, 623.60it/s, now=None][A
+                                                                  
+
+
+
+
+                                                                   
+[A[A[A
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [03:19<3:39:26, 199.49s/it, now=None]
+
+
+
+chunk:  32%|███▏      | 114/357 [00:06<00:00, 614.99it/s, now=None][A[A[A
+
+chunk:  28%|██▊       | 114/402 [01:49<00:00, 623.60it/s, now=None][A
+
+
+chunk:   0%|          | 0/402 [00:00<?, ?it/s, now=None][A[A
+
+
+chunk:  26%|██▌       | 105/402 [00:00<00:00, 491.87it/s, now=None][A[A
+_____________________________ test_video_mode_fit _____________________________
+tests\test_video_mode.py:32: in test_video_mode_fit
+    res = utils.render_video_moviepy(item, str(out_mp4), dry_run=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1996,) (1996,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_video_mode_fit0\out_fit.mp4.
+MoviePy - Writing audio in out_fitTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+                                                                  
+
+
+
+
+                                                                   
+[A[A[A
+
+
+                                                                   
+[A[A
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [03:21<3:41:36, 201.46s/it, now=None]
+
+
+
+chunk:  32%|███▏      | 114/357 [00:08<00:00, 614.99it/s, now=None][A[A[A
+
+
+chunk:  28%|██▊       | 114/402 [00:01<00:00, 491.87it/s, now=None][A[A
+
+chunk:  28%|██▊       | 114/402 [01:51<00:00, 623.60it/s, now=None][A
+                                                                  
+
+
+
+
+                                                                   
+[A[A[A
+
+
+                                                                   
+[A[A
+
+                                                                   
+[A
+chunk:   1%|▏         | 1/67 [03:21<3:41:36, 201.46s/it, now=None]
+
+
+
+chunk:  32%|███▏      | 114/357 [00:08<00:00, 614.99it/s, now=None][A[A[A
+
+
+chunk:  28%|██▊       | 114/402 [00:01<00:00, 491.87it/s, now=None][A[A
+
+chunk:  28%|██▊       | 114/402 [01:51<00:00, 623.60it/s, now=None][A
+
+
+
+
+chunk:   0%|          | 0/402 [00:00<?, ?it/s, now=None][A[A[A[A
+
+
+
+
+chunk:  26%|██▌       | 105/402 [00:00<00:00, 627.41it/s, now=None][A[A[A[A
+-------------------------- Captured stderr teardown ---------------------------
+
+
+
+                                                                   [A[A
+                                                                  
+
+
+                                                                   [A
+
+
+
+                                                                   [A[A[A
+____________________________ test_video_mode_cover ____________________________
+tests\test_video_mode.py:62: in test_video_mode_cover
+    res = utils.render_video_moviepy(item, str(out_mp4), dry_run=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1996,) (1996,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_video_mode_cover0\out_cover.mp4.
+MoviePy - Writing audio in out_coverTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+
+
+
+
+                                                                   
+[A[A[A[A
+
+
+
+
+chunk:  28%|██▊       | 114/402 [00:02<00:00, 627.41it/s, now=None][A[A[A[A
+
+
+
+
+                                                                   
+[A[A[A[A
+
+
+
+
+chunk:  28%|██▊       | 114/402 [00:02<00:00, 627.41it/s, now=None][A[A[A[A
+chunk:   0%|          | 0/402 [00:00<?, ?it/s, now=None]
+chunk:  26%|██▌       | 105/402 [00:00<00:00, 630.51it/s, now=None]
+_______________________ test_video_mode_default_is_fit ________________________
+tests\test_video_mode.py:92: in test_video_mode_default_is_fit
+    res = utils.render_video_moviepy(item, str(out_mp4), dry_run=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+spellvid\utils.py:3622: in render_video_moviepy
+    final_clip.write_videofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:153: in wrapper
+    return func(clip, *new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:24: in convert_masks_to_RGB
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\video\VideoClip.py:379: in write_videofile
+    self.audio.write_audiofile(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:258: in write_audiofile
+    return ffmpeg_audiowrite(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\io\ffmpeg_audiowriter.py:220: in ffmpeg_audiowrite
+    for chunk in clip.iter_chunks(
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:112: in iter_chunks
+    yield self.to_soundarray(
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:53: in requires_duration
+    return func(clip, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:160: in to_soundarray
+    snd_array = self.get_frame(tt)
+                ^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\AudioClip.py:410: in frame_function
+    clip.get_frame(t - clip.start) * np.array([part]).T
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\decorator.py:235: in fun
+    return caller(func, *(extras + args), **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\decorators.py:102: in wrapper
+    return func(*new_args, **new_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:87: in get_frame
+    return self.frame_function(t)
+           ^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\Clip.py:130: in <lambda>
+    new_clip = self.with_updated_frame_function(lambda t: func(self.get_frame, t))
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\moviepy\audio\fx\AudioFadeOut.py:60: in <lambda>
+
+
+
+
+
+                                                                   [A[A[A[A
+
+    lambda get_frame, t: get_factor(t, self.duration) * get_frame(t),
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: operands could not be broadcast together with shapes (1996,) (1996,2)
+---------------------------- Captured stdout call -----------------------------
+MoviePy - Building video C:\Users\hamow\AppData\Local\Temp\pytest-of-hamow\pytest-228\test_video_mode_default_is_fit0\out_default.mp4.
+MoviePy - Writing audio in out_defaultTEMP_MPY_wvf_snd.mp4
+---------------------------- Captured stderr call -----------------------------
+
+                                                                   
+
+
+
+
+
+                                                                   
+[A[A[A[A
+chunk:  28%|██▊       | 114/402 [00:01<00:00, 630.51it/s, now=None]
+
+
+
+
+chunk:  28%|██▊       | 114/402 [00:03<00:00, 627.41it/s, now=None][A[A[A[A
+                                                                   
+
+
+
+
+
+                                                                   
+[A[A[A[A
+chunk:  28%|██▊       | 114/402 [00:01<00:00, 630.51it/s, now=None]
+
+
+
+
+chunk:  28%|██▊       | 114/402 [00:03<00:00, 627.41it/s, now=None][A[A[A[A
+
+chunk:   0%|          | 0/402 [00:00<?, ?it/s, now=None][A
+
+chunk:  26%|██▌       | 105/402 [00:00<00:00, 590.62it/s, now=None][A
+-------------------------- Captured stderr teardown ---------------------------
+
+                                                                   
+
+______________________ test_zhuyin_neutral_tone_offsets _______________________
+tests\test_zhuyin.py:103: in test_zhuyin_neutral_tone_offsets
+    assert layout["main_start_y"] == layout["tone_start_y"] + expected_gap
+E   assert 38 == (10 + 20)
+============================== warnings summary ===============================
+tests\test_batch_concatenation.py:9
+  C:\Projects\en_words\tests\test_batch_concatenation.py:9: DeprecationWarning: The spellvid.utils module is deprecated. Please migrate to the new modular architecture. See ARCHITECTURE.md for details.
+    from spellvid.utils import (
+
+tests/test_entry_video.py::test_cli_make_respects_entry_hold_flag
+  C:\Projects\en_words\tests\test_entry_video.py:166: DeprecationWarning: cli.make() is deprecated. Use cli.make_command() instead.
+    rc = cli.make(args)
+
+tests/test_integration.py::test_batch_dry_run
+  C:\Projects\en_words\tests\test_integration.py:54: DeprecationWarning: cli.batch() is deprecated. Use cli.batch_command() instead.
+    rc = cli.batch(args)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+SKIPPED [1] tests\contract\test_media_processor_contract.py:90: 找不到測試音訊檔案
+SKIPPED [1] tests\contract\test_media_processor_contract.py:136: 找不到測試視頻檔案
+SKIPPED [1] tests\contract\test_media_processor_contract.py:177: 找不到測試視頻檔案
+SKIPPED [1] tests\integration\test_batch_service.py:55: 尚未實作 BatchService
+SKIPPED [1] tests\integration\test_batch_service.py:84: 尚未實作 BatchService
+SKIPPED [1] tests\integration\test_batch_service.py:122: 尚未實作 BatchService
+SKIPPED [1] tests\integration\test_batch_service.py:159: 尚未實作 BatchService
+SKIPPED [1] tests\integration\test_batch_service.py:191: 尚未實作 BatchService
+SKIPPED [1] tests\integration\test_batch_service.py:218: 尚未實作 BatchService
+SKIPPED [1] tests\integration\test_cli_batch.py:31: 尚未實作 CLI batch 命令
+SKIPPED [1] tests\integration\test_cli_batch.py:77: 尚未實作 CLI batch 命令
+SKIPPED [1] tests\integration\test_cli_batch.py:135: 尚未實作 CLI batch 命令
+SKIPPED [1] tests\integration\test_cli_batch.py:185: 尚未實作 CLI batch 命令
+SKIPPED [1] tests\integration\test_cli_batch.py:213: 尚未實作 CLI batch 命令
+SKIPPED [1] tests\integration\test_cli_batch.py:237: 尚未實作 CLI batch 命令
+SKIPPED [1] tests\integration\test_cli_make.py:31: 尚未實作 CLI make 命令
+SKIPPED [1] tests\integration\test_cli_make.py:63: 尚未實作 CLI make 命令
+SKIPPED [1] tests\integration\test_cli_make.py:95: 尚未實作 CLI make 命令
+SKIPPED [1] tests\integration\test_cli_make.py:134: 尚未實作 CLI make 命令
+SKIPPED [1] tests\integration\test_cli_make.py:160: 尚未實作 CLI make 命令
+SKIPPED [1] tests\integration\test_cli_make.py:189: 尚未實作 CLI make 命令
+SKIPPED [1] tests\integration\test_video_service.py:91: 尚未實作 VideoService
+SKIPPED [1] tests\integration\test_video_service.py:122: 尚未實作 VideoService
+SKIPPED [1] tests\integration\test_video_service.py:149: 尚未實作 VideoService
+SKIPPED [1] tests\integration\test_video_service.py:185: 尚未實作 VideoService
+SKIPPED [1] tests\integration\test_video_service.py:239: 尚未實作 VideoService
+SKIPPED [1] tests\performance\test_benchmarks.py: Slow test - requires full video rendering (manual execution only)
+SKIPPED [1] tests\test_batch_concatenation.py:284: T006: 等待 skip_ending 參數實作（T008-T011）
+SKIPPED [1] tests\test_batch_concatenation.py:295: T007: 等待 skip_ending 參數實作（T008-T011）
+SKIPPED [1] tests\test_entry_video.py:240: 缺少 out/test-entry01.mp4，請先執行 scripts/render_example.ps1
+===== 14 failed, 169 passed, 30 skipped, 3 warnings in 255.36s (0:04:15) ======
+                                                                   [AException ignored in atexit callback <function cleanup_numbered_dir at 0x0000024637C7ECA0>:
+Traceback (most recent call last):
+  File "C:\Projects\en_words\.venv\Lib\site-packages\_pytest\pathlib.py", line 374, in cleanup_numbered_dir
+    cleanup_dead_symlinks(root)
+  File "C:\Projects\en_words\.venv\Lib\site-packages\_pytest\pathlib.py", line 359, in cleanup_dead_symlinks
+    if not left_dir.resolve().exists():
+  File "C:\Users\hamow\AppData\Local\Programs\Python\Python313\Lib\pathlib\_abc.py", line 450, in exists
+    self.stat(follow_symlinks=follow_symlinks)
+  File "C:\Users\hamow\AppData\Local\Programs\Python\Python313\Lib\pathlib\_local.py", line 515, in stat
+    return os.stat(self, follow_symlinks=follow_symlinks)
+PermissionError: [WinError 5] 存取被拒。: 'C:\\Users\\hamow\\AppData\\Local\\Temp\\pytest-of-hamow\\pytest-current'
