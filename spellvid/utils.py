@@ -659,9 +659,9 @@ def _find_and_set_ffmpeg():
 
 def _measure_text_with_pil(text: str, pil_font: ImageFont.ImageFont):
     """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
-    
+
     已遷移至: spellvid.infrastructure.rendering.pillow_adapter._measure_text_with_pil
-    
+
     Measure text size (w, h) using Pillow's textbbox reliably.
 
     Returns fallback heuristics on error.
@@ -674,9 +674,9 @@ def _measure_text_with_pil(text: str, pil_font: ImageFont.ImageFont):
 
 def _find_system_font(prefer_cjk: bool, size: int):
     """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
-    
+
     已遷移至: spellvid.infrastructure.rendering.pillow_adapter._find_system_font
-    
+
     Try common system font paths; return PIL ImageFont (truetype)
     or load_default.
     """
@@ -696,97 +696,28 @@ def _make_text_imageclip(
     extra_bottom: int = 0,
     fixed_size: tuple | None = None,
 ):
-    """Render text with Pillow and return a MoviePy ImageClip.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+    
+    已遷移至: spellvid.infrastructure.rendering.pillow_adapter._make_text_imageclip
+    
+    Render text with Pillow and return a MoviePy ImageClip.
 
     prefer_cjk: if True, tries CJK fonts first.
     bg: background color tuple or None for transparent.
     """
-    try:
-        font = _find_system_font(prefer_cjk, font_size)
-        w, h = _measure_text_with_pil(text, font)
-    except Exception:
-        font = ImageFont.load_default()
-        w, h = (int(len(text) * font_size * 0.6), font_size)
-
-    pad_x = max(12, font_size // 6)  # increased padding
-    pad_y = max(8, font_size // 6)   # increased padding
-    # allow caller to request timer-specific extra bottom safe margin via
-    # passing bg=(0,0,0) conventionally for timer usage; default margin 0
-    # allow caller to request an extra bottom safe margin; preserve the
-    # existing heuristic where a black bg indicates timer usage and needs
-    # additional margin. Caller may pass `extra_bottom` (e.g. reveal safe
-    # margin) to reserve space beneath glyphs for underlines.
-    bottom_safe_margin = int(extra_bottom or 0)
-    if bg is not None and isinstance(bg, tuple) and len(bg) == 3:
-        # heuristics: treat black bg callsites (timer) as needing extra bottom
-        # margin to avoid glyph descent clipping. Keep this on top of
-        # any extra_bottom requested by the caller.
-        if bg == (0, 0, 0):
-            bottom_safe_margin += 32
-
-    img_w = int(w + pad_x * 2)
-    img_h = int(h + pad_y * 2 + bottom_safe_margin)
-    # If caller requests a fixed canvas size (w,h), center the rendered
-    # text inside that canvas. This helps when rendering per-letter
-    # clips in a group so adding/removing letters doesn't change each
-    # clip's size and avoids downstream reflow in CompositeVideoClip.
-    if fixed_size is not None:
-        try:
-            fx_w, fx_h = int(fixed_size[0]), int(fixed_size[1])
-            # ensure fixed canvas at least as big as measured image
-            img_w = max(img_w, fx_w)
-            img_h = max(img_h, fx_h)
-            # align text to the same left/top origin used by the full
-            # reveal image so substrings don't change their left position
-            # relative to the fixed canvas. This keeps pad_x/pad_y as the
-            # drawing origin for all substrings.
-            offset_x = 0
-            offset_y = 0
-        except Exception:
-            offset_x = 0
-            offset_y = 0
-    else:
-        offset_x = 0
-        offset_y = 0
-    bg_col = (255, 255, 255, 0) if bg is None else tuple(bg) + (255,)
-    img = Image.new("RGBA", (img_w, img_h), bg_col)
-    draw = ImageDraw.Draw(img)
-    # draw text at pad + any centering offset
-    draw_x = pad_x + offset_x
-    draw_y = pad_y + offset_y
-    draw.text((draw_x, draw_y), text, font=font, fill=color)
-    arr = _np.array(img)
-    # If moviepy is available, wrap into an ImageClip. Otherwise return a
-    # tiny fallback object that exposes the minimal API used by tests
-    # (get_frame, w, h, size, with_duration).
-    if _mpy is not None:
-        clip = _mpy.ImageClip(arr)
-        if duration is not None:
-            clip = clip.with_duration(duration)
-        return clip
-
-    class _SimpleImageClip:
-        def __init__(self, arr, duration=None):
-            self._arr = arr
-            self.h = int(arr.shape[0])
-            self.w = int(arr.shape[1])
-            self.size = (self.w, self.h)
-            self._duration = duration
-
-        def get_frame(self, t=0):
-            return self._arr
-
-        def with_duration(self, duration):
-            self._duration = duration
-            return self
-
-        # minimal attributes moviepy users expect
-        @property
-        def duration(self):
-            return self._duration
-
-    clip = _SimpleImageClip(arr, duration=duration)
-    return clip
+    from spellvid.infrastructure.rendering.pillow_adapter import (
+        _make_text_imageclip as _migrated_make_text_imageclip
+    )
+    return _migrated_make_text_imageclip(
+        text=text,
+        font_size=font_size,
+        color=color,
+        bg=bg,
+        duration=duration,
+        prefer_cjk=prefer_cjk,
+        extra_bottom=extra_bottom,
+        fixed_size=fixed_size
+    )
 
 
 # configure ffmpeg as early as possible
