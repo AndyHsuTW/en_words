@@ -433,12 +433,12 @@ def _layout_zhuyin_column(
     tone_gap: int = 10,
 ) -> Dict[str, Any]:
     """計算注音符號直行的垂直位置佈局
-    
+
     此函數處理注音符號(聲母、韻母、介音)與聲調符號的垂直排列,
     包含特殊處理:
     - 輕聲(˙)置於主要符號上方,居中對齊
     - 其他聲調置於主要符號右側,垂直置中
-    
+
     Args:
         cursor_y: 直行起始 Y 座標 (頂部)
         col_h: 直行可用高度
@@ -446,7 +446,7 @@ def _layout_zhuyin_column(
         tone_syms: 聲調符號列表 (例如: ["ˊ"] 或 ["˙"])
         tone_sizes: 聲調符號的 (寬, 高) 列表
         tone_gap: 符號間的間距 (預設 10px)
-    
+
     Returns:
         包含佈局資訊的字典:
         - main_start_y: 主要符號起始 Y 座標
@@ -454,7 +454,7 @@ def _layout_zhuyin_column(
         - tone_box_height: 聲調區域總高度
         - tone_alignment: 聲調對齊方式 ("center" 或 "right")
         - tone_is_neutral: 是否為輕聲
-    
+
     Examples:
         >>> # 一般聲調 (ˊ) - 置於右側垂直置中
         >>> _layout_zhuyin_column(
@@ -463,7 +463,7 @@ def _layout_zhuyin_column(
         ... )
         {'main_start_y': 100, 'tone_start_y': 140, 'tone_box_height': 15,
          'tone_alignment': 'right', 'tone_is_neutral': False}
-        
+
         >>> # 輕聲 (˙) - 置於上方居中
         >>> _layout_zhuyin_column(
         ...     cursor_y=100, col_h=200, total_main_h=80,
@@ -484,7 +484,7 @@ def _layout_zhuyin_column(
         limit_main_start = top + col_height - safe_total_main_h
         if limit_main_start < base_main_start_y:
             base_main_start_y = limit_main_start
-    
+
     layout: Dict[str, Any] = {
         "main_start_y": base_main_start_y,
         "tone_start_y": None,
@@ -492,7 +492,7 @@ def _layout_zhuyin_column(
         "tone_alignment": "right",
         "tone_is_neutral": tone_is_neutral,
     }
-    
+
     # 如果沒有聲調符號,直接返回
     if not tone_syms or not tone_sizes:
         return layout
@@ -511,13 +511,13 @@ def _layout_zhuyin_column(
         gap_to_main = tone_gap if has_content else 0
         block_h = safe_total_main_h + tone_total_h + gap_to_main
         block_start_y = top
-        
+
         # 整體區塊置中
         if block_h > 0:
             limit_block_start = top + col_height - block_h
             if limit_block_start < block_start_y:
                 block_start_y = limit_block_start
-        
+
         layout["tone_start_y"] = block_start_y
         layout["main_start_y"] = block_start_y + tone_total_h + gap_to_main
         layout["tone_box_height"] = tone_total_h
@@ -526,13 +526,13 @@ def _layout_zhuyin_column(
         # 一般聲調: 置於主要符號右側,垂直置中
         layout["main_start_y"] = base_main_start_y
         tone_start_y = base_main_start_y + max(0, safe_total_main_h // 2)
-        
+
         # 確保聲調不超出可用高度
         if tone_total_h > 0:
             max_tone_start = top + col_height - tone_total_h
             if tone_start_y > max_tone_start:
                 tone_start_y = max_tone_start
-        
+
         layout["tone_start_y"] = tone_start_y
         layout["tone_box_height"] = tone_total_h or safe_total_main_h
 
