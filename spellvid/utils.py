@@ -658,20 +658,18 @@ def _find_and_set_ffmpeg():
 
 
 def _measure_text_with_pil(text: str, pil_font: ImageFont.ImageFont):
-    """Measure text size (w, h) using Pillow's textbbox reliably.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+    
+    已遷移至: spellvid.infrastructure.rendering.pillow_adapter._measure_text_with_pil
+    
+    Measure text size (w, h) using Pillow's textbbox reliably.
 
     Returns fallback heuristics on error.
     """
-    try:
-        img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        bbox = draw.textbbox((0, 0), text, font=pil_font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    except Exception:
-        return (
-            int(len(text) * getattr(pil_font, "size", 10)),
-            getattr(pil_font, "size", 16),
-        )
+    from spellvid.infrastructure.rendering.pillow_adapter import (
+        _measure_text_with_pil as _migrated_measure_text_with_pil
+    )
+    return _migrated_measure_text_with_pil(text, pil_font)
 
 
 def _find_system_font(prefer_cjk: bool, size: int):

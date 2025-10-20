@@ -398,3 +398,57 @@ def _find_system_font(prefer_cjk: bool, size: int):
     except Exception:
         # 極端情況: 預設字型也失敗
         return ImageFont.load_default()
+
+
+def _measure_text_with_pil(text: str, pil_font: ImageFont.ImageFont):
+    """使用 Pillow 測量文字尺寸 (寬度, 高度)
+    
+    使用 PIL 的 textbbox 方法精確測量文字渲染後的邊界框尺寸。
+    在測量失敗時返回基於字型大小的啟發式估算。
+    
+    Args:
+        text: 要測量的文字字串
+        pil_font: PIL ImageFont 物件 (來自 ImageFont.truetype 或 load_default)
+    
+    Returns:
+        Tuple[int, int]: (寬度, 高度) 以像素為單位
+            - 成功: 基於實際渲染的精確測量
+            - 失敗: 啟發式估算 (長度 * 字型大小, 字型大小)
+    
+    Examples:
+        >>> from PIL import ImageFont
+        >>> font = ImageFont.truetype("arial.ttf", 48)
+        >>> w, h = _measure_text_with_pil("Hello", font)
+        >>> print(f"Text size: {w}x{h}")
+        Text size: 120x56
+    
+    Notes:
+        - 使用 10x10 的臨時圖像進行測量 (不影響結果)
+        - textbbox 返回 (left, top, right, bottom)
+        - 寬度 = right - left, 高度 = bottom - top
+        - 失敗時的啟發式: w = len(text) * font.size, h = font.size
+    
+    遷移自: spellvid/utils.py:660
+    遷移日期: 2025-01-20
+    """
+    try:
+        # 建立臨時圖像用於測量
+        img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        # 使用 textbbox 獲取精確邊界框
+        bbox = draw.textbbox((0, 0), text, font=pil_font)
+        
+        # 計算寬度與高度
+        width = bbox[2] - bbox[0]   # right - left
+        height = bbox[3] - bbox[1]  # bottom - top
+        
+        return width, height
+    except Exception:
+        # 測量失敗,使用啟發式估算
+        # 假設每個字元約佔字型大小的寬度
+        font_size = getattr(pil_font, "size", 10)
+        estimated_width = int(len(text) * font_size)
+        estimated_height = getattr(pil_font, "size", 16)
+        
+        return estimated_width, estimated_height
