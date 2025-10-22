@@ -9,6 +9,7 @@
 """
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -26,6 +27,40 @@ from spellvid.shared.constants import (
 
 # Infrastructure layer imports
 from spellvid.infrastructure.video.interface import IVideoComposer
+
+
+# ============================================================================
+# VideoRenderingContext - Single source of truth for rendering inputs
+# ============================================================================
+
+@dataclass
+class VideoRenderingContext:
+    """Encapsulates all data needed for video rendering.
+    
+    This context is prepared once and passed to all rendering functions,
+    eliminating the need to recompute layouts, timelines, or contexts.
+    
+    Attributes:
+        item: Original JSON configuration from user
+        layout: Computed layout from domain.layout.compute_layout_bboxes
+        timeline: Time markers from domain.timing.calculate_timeline
+        entry_ctx: Entry video context (path, duration, enabled)
+        ending_ctx: Ending video context (path, duration, enabled)
+        letters_ctx: Letter images context (paths, bbox, missing)
+        metadata: Additional computed info (durations, paths, etc.)
+    """
+    item: Dict[str, Any]
+    layout: Dict[str, Any]
+    timeline: Dict[str, Any]
+    entry_ctx: Dict[str, Any]
+    ending_ctx: Dict[str, Any]
+    letters_ctx: Dict[str, Any]
+    metadata: Dict[str, Any]
+
+
+# ============================================================================
+# Public API
+# ============================================================================
 
 
 def render_video(
