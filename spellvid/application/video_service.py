@@ -282,6 +282,224 @@ def _create_background_clip(ctx: VideoRenderingContext) -> Any:
     return bg_clip
 
 
+def _render_letters_layer(ctx: VideoRenderingContext) -> Any:
+    """Render letter images in top-left.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with letters_ctx and layout
+    
+    Returns:
+        MoviePy CompositeVideoClip with positioned letter images
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Load letter images from letters_ctx
+    # TODO: Position according to layout["letters"]
+    # TODO: Create composite clip
+    
+    # Stub: return empty clip for now
+    return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
+
+
+def _render_chinese_zhuyin_layer(ctx: VideoRenderingContext) -> Any:
+    """Render Chinese text + Zhuyin annotations in top-right.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with item (word_zh) and layout
+    
+    Returns:
+        MoviePy ImageClip with rendered text
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Parse zhuyin from word_zh
+    # TODO: Render Chinese + zhuyin using Pillow
+    # TODO: Position according to layout["word_zh"]
+    
+    # Stub: return empty clip
+    return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
+
+
+def _render_timer_layer(ctx: VideoRenderingContext) -> Any:
+    """Render countdown timer in top-left corner.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with timeline (countdown_sec)
+    
+    Returns:
+        MoviePy Clip with dynamic countdown text
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Create timer clips for each second
+    # TODO: Position according to layout["timer"]
+    
+    # Stub: return empty clip
+    return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
+
+
+def _render_reveal_layer(ctx: VideoRenderingContext) -> Any:
+    """Render word reveal animation (typing effect) in bottom center.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with item (word_en) and timeline
+    
+    Returns:
+        MoviePy Clip with typing animation
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Create reveal animation clips
+    # TODO: Add underlines
+    # TODO: Position according to layout["reveal"]
+    
+    # Stub: return empty clip
+    return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
+
+
+def _render_progress_bar_layer(ctx: VideoRenderingContext) -> Any:
+    """Render progress bar at bottom of video.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with timeline (total_duration)
+    
+    Returns:
+        MoviePy Clip with animated progress bar
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Create progress bar segments
+    # TODO: Position at bottom
+    
+    # Stub: return empty clip
+    return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
+
+
+def _process_audio_tracks(ctx: VideoRenderingContext) -> Any:
+    """Mix background music + countdown beeps.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with item (music_path) and timeline
+    
+    Returns:
+        MoviePy AudioClip (mixed audio)
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Load music file
+    # TODO: Generate beeps
+    # TODO: Mix audio tracks
+    
+    # Stub: return silent audio
+    from moviepy.audio.AudioClip import AudioClip
+    return AudioClip(lambda t: [0, 0], duration=ctx.timeline["total_duration"])
+
+
+def _load_entry_ending_clips(
+    ctx: VideoRenderingContext
+) -> tuple[Optional[Any], Optional[Any]]:
+    """Load optional entry and ending video clips.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with entry_ctx and ending_ctx
+    
+    Returns:
+        Tuple of (entry_clip, ending_clip) - either or both may be None
+    """
+    # TODO: Load entry video if enabled
+    # TODO: Load ending video if enabled
+    
+    # Stub: return None for both
+    return (None, None)
+
+
+def _compose_and_export(
+    ctx: VideoRenderingContext,
+    layers: list[Any],
+    audio: Any,
+    output_path: str,
+    composer: Optional[IVideoComposer] = None
+) -> None:
+    """Combine all layers + audio and export to MP4.
+    
+    TODO: Extract full implementation from render_video_moviepy
+    
+    Args:
+        ctx: VideoRenderingContext with metadata
+        layers: List of MoviePy Clips (background, letters, etc.)
+        audio: MoviePy AudioClip
+        output_path: Output MP4 file path
+        composer: IVideoComposer implementation (None = default MoviePy)
+    
+    Side Effects:
+        Writes MP4 file to output_path
+    """
+    # Import MoviePy
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        import moviepy as mpy  # type: ignore
+    
+    # TODO: Composite all layers
+    # TODO: Set audio
+    # TODO: Export to file
+    
+    # Stub: create simple composite and export
+    if layers:
+        final_clip = mpy.CompositeVideoClip(layers)
+        if audio:
+            final_clip = final_clip.with_audio(audio)
+        
+        # Create output directory
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Export (simplified)
+        final_clip.write_videofile(
+            output_path,
+            fps=ctx.metadata.get("fps", 24),
+            codec="libx264",
+            audio_codec="aac"
+        )
+
+
 # ============================================================================
 # Public API
 # ============================================================================
