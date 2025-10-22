@@ -358,7 +358,7 @@ Phase 9: Documentation (T023-T025)
 
 ## Phase 5: Orchestration
 
-- [ ] **T015** Refactor render_video() to orchestrate sub-functions (TDD)
+- [x] **T015** Refactor render_video() to orchestrate sub-functions (TDD) ✅
   - **Files**:
     - Test: `tests/unit/application/test_video_service.py`
     - Impl: `spellvid/application/video_service.py`
@@ -368,12 +368,12 @@ Phase 9: Documentation (T023-T025)
        - Test: render_video() calls all sub-functions in correct order
        - Use mocks to verify call sequence
        - Run: `pytest tests/unit/application/test_video_service.py::test_render_video_orchestration -v`
-       - **Verify FAIL**: Test expects new API
-       - Commit: `test: add orchestration test for render_video()`
+       - **Verify FAIL**: Test expects new API ✅ (AttributeError: 'dict' object has no attribute 'word_zh')
+       - Commit: df88458 `test: add orchestration tests for render_video() (T015)`
     2. **Refactor function** (GREEN 🟢):
-       - Create new `render_video()` in `video_service.py` (~50-80 lines)
+       - Create new `render_video()` in `video_service.py` (~80 lines)
        - Signature: `def render_video(item, out_path, dry_run=False, skip_ending=False, composer=None) -> Dict[str, Any]:`
-       - Call all 10 sub-functions in sequence:
+       - Call all 11 sub-functions in sequence:
          1. ctx = _prepare_all_context(item)
          2. bg = _create_background_clip(ctx)
          3. letters = _render_letters_layer(ctx)
@@ -384,12 +384,13 @@ Phase 9: Documentation (T023-T025)
          8. audio = _process_audio_tracks(ctx)
          9. entry, ending = _load_entry_ending_clips(ctx)
          10. _compose_and_export(ctx, layers, audio, out_path, composer)
-       - Run: `pytest tests/unit/application/test_video_service.py::test_render_video_orchestration -v`
-       - **Verify PASS**: Test green ✅
-       - Commit: `refactor: rewrite render_video() to orchestrate 11 sub-functions`
-  - **Expected**: Test passes, render_video() orchestrates all sub-functions
+       - Run: `pytest tests/unit/application/test_video_service.py -k orchestration -v`
+       - **Verify PASS**: 3 tests green ✅
+       - Commit: 87215c3 `refactor: rewrite render_video() to orchestrate 11 sub-functions (T015)`
+  - **Expected**: Test passes, render_video() orchestrates all sub-functions ✅
   - **Rollback**: `git reset --hard HEAD~2`
   - **Validation**: Run `pytest tests/integration/test_end_to_end_migration.py -v` (must pass)
+  - **Result**: ✅ Completed - 9/9 unit tests passing, orchestration verified
 
 ---
 
