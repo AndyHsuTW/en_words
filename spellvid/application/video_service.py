@@ -36,10 +36,10 @@ from spellvid.infrastructure.video.interface import IVideoComposer
 @dataclass
 class VideoRenderingContext:
     """Encapsulates all data needed for video rendering.
-    
+
     This context is prepared once and passed to all rendering functions,
     eliminating the need to recompute layouts, timelines, or contexts.
-    
+
     Attributes:
         item: Original JSON configuration from user
         layout: Computed layout from domain.layout.compute_layout_bboxes
@@ -56,6 +56,120 @@ class VideoRenderingContext:
     ending_ctx: Dict[str, Any]
     letters_ctx: Dict[str, Any]
     metadata: Dict[str, Any]
+
+
+# ============================================================================
+# Private Helper Functions
+# ============================================================================
+
+def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
+    """Prepare all rendering context data upfront.
+    
+    Gathers all necessary data for video rendering:
+    - Layout computation (bboxes for all elements)
+    - Timeline calculation (timing for countdown, reveal, etc.)
+    - Entry/ending video contexts
+    - Letters resource contexts
+    - Metadata (video size, fps, etc.)
+    
+    Args:
+        item: JSON configuration dict (must pass schema validation)
+    
+    Returns:
+        VideoRenderingContext with all computed data
+    
+    Raises:
+        ValueError: If item fails validation
+        FileNotFoundError: If required assets missing (unless dry_run)
+    
+    Example:
+        >>> item = {"letters": "C c", "word_en": "Cat", "word_zh": "貓", ...}
+        >>> ctx = _prepare_all_context(item)
+        >>> assert "letters_bbox" in ctx.layout
+    """
+    # Import context_builder functions
+    from spellvid.application.context_builder import (
+        prepare_entry_context,
+        prepare_ending_context,
+        prepare_letters_context,
+    )
+    
+    # Set defaults for optional fields
+    if "countdown_sec" not in item:
+        item["countdown_sec"] = 10
+    if "reveal_hold_sec" not in item:
+        item["reveal_hold_sec"] = 5
+    
+    # Validate required fields
+    required_fields = [
+        "letters", "word_en", "word_zh", "image_path", "music_path"
+    ]
+    missing = [f for f in required_fields if f not in item]
+    if missing:
+        raise ValueError(
+            f"Missing required fields: {', '.join(missing)}"
+        )
+    
+    # Convert item dict to VideoConfig for layout computation
+    from spellvid.shared.types import VideoConfig as VC
+    config = VC(
+        letters=item["letters"],
+        word_en=item["word_en"],
+        word_zh=item["word_zh"],
+        image_path=item.get("image_path", ""),
+        music_path=item.get("music_path", ""),
+        countdown_sec=int(item.get("countdown_sec", 10)),
+        reveal_hold_sec=int(item.get("reveal_hold_sec", 5)),
+    )
+    
+    # Compute layout
+    layout_result = compute_layout_bboxes(config)
+    layout = layout_result.to_dict()
+    
+    # Compute timeline
+    per_letter_time = 1.0
+    word_en = item.get("word_en", "")
+    reveal_time = len(word_en) * per_letter_time
+    countdown = int(item.get("countdown_sec", 10))
+    reveal_hold = int(item.get("reveal_hold_sec", 5))
+    main_duration = countdown + reveal_time + reveal_hold
+    
+    timeline = {
+        "countdown_start": 0.0,
+        "countdown_end": float(countdown),
+        "reveal_start": float(countdown),
+        "reveal_end": float(countdown + reveal_time),
+        "hold_start": float(countdown + reveal_time),
+        "hold_end": main_duration,
+        "total_duration": main_duration,
+    }
+    
+    # Prepare entry context
+    entry_ctx = prepare_entry_context(item)
+    
+    # Prepare ending context
+    ending_ctx = prepare_ending_context(item)
+    
+    # Prepare letters context
+    letters_ctx = prepare_letters_context(item)
+    
+    # Prepare metadata
+    metadata = {
+        "video_size": (1920, 1080),  # CANVAS_WIDTH, CANVAS_HEIGHT
+        "fps": 24,
+        "bg_color": (255, 250, 233),  # COLOR_WHITE
+        "main_duration": main_duration,
+    }
+    
+    return VideoRenderingContext(
+        item=item,
+        layout=layout,
+        timeline=timeline,
+        entry_ctx=entry_ctx,
+        ending_ctx=ending_ctx,
+        letters_ctx=letters_ctx,
+        metadata=metadata,
+    )
 
 
 # ============================================================================
