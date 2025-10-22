@@ -128,3 +128,201 @@ def render_batch(
         "results": results,
         "status": "completed",
     }
+
+
+def concatenate_videos_with_transitions(
+    video_paths: List[str],
+    output_path: str,
+    fade_in_duration: float = None,
+    apply_audio_fadein: bool = False,
+) -> Dict[str, Any]:
+    """拼接多支視頻並添加轉場效果
+
+    載入多個視頻檔案,為除第一支外的視頻添加淡入效果,並拼接為單一輸出。
+    每支輸入視頻應已在渲染階段套用淡出效果。
+
+    Args:
+        video_paths: 待拼接的視頻檔案路徑列表(按順序)
+        output_path: 最終拼接輸出視頻的路徑
+        fade_in_duration: 淡入時長(秒)。None 則使用預設值 1.0s
+        apply_audio_fadein: True 則同時對音訊套用淡入(Phase 3 功能)
+
+    Returns:
+        狀態資訊字典:
+        - status: "ok" | "error" | "skipped"
+        - message: 錯誤訊息(若 status 為 "error")
+        - output: 輸出檔案路徑(若成功)
+        - clips_count: 拼接的片段數量
+        - total_duration: 拼接視頻總時長
+
+    Decision References:
+        - D1: 所有視頻都有淡出(在渲染時套用)
+        - D2: 第一支視頻不淡入;後續視頻有 1s 淡入
+        - D4: 音訊淡入由 apply_audio_fadein 參數控制
+
+    Example:
+        >>> paths = ["out/word1.mp4", "out/word2.mp4", "out/word3.mp4"]
+        >>> result = concatenate_videos_with_transitions(
+        ...     paths, "out/batch.mp4", fade_in_duration=1.0
+        ... )
+        >>> result["status"]
+        'ok'
+        >>> result["clips_count"]
+        3
+    """
+    # Import MoviePy and constants
+    try:
+        import moviepy.editor as mpy
+        _HAS_MOVIEPY = True
+    except ImportError:
+        _HAS_MOVIEPY = False
+
+    from spellvid.shared.constants import FADE_IN_DURATION
+    from spellvid.infrastructure.video.effects import (
+        apply_fadein_effect
+    )
+
+    if not _HAS_MOVIEPY:
+        return {
+            "status": "error",
+            "message": "MoviePy not available for video concatenation"
+        }
+
+    if not video_paths:
+        return {
+            "status": "error",
+            "message": "No video paths provided for concatenation"
+        }
+
+    if fade_in_duration is None:
+        fade_in_duration = FADE_IN_DURATION
+
+    clips = []
+    cleanup_clips = []
+
+    try:
+        # Load and process each video
+        for idx, path in enumerate(video_paths):
+            if not os.path.exists(path):
+                # Clean up already loaded clips
+                for clip in cleanup_clips:
+                    try:
+                        clip.close()
+                    except Exception:
+                        pass
+                return {
+                    "status": "error",
+                    "message": f"Video file not found: {path}"
+                }
+
+            try:
+                # Load video clip
+                clip = mpy.VideoFileClip(path)
+                cleanup_clips.append(clip)
+
+                # D2 Decision: First video does not fade in
+                if idx == 0:
+                    # First video: use as-is (already has fade-out)
+                    clips.append(clip)
+                else:
+                    # Subsequent videos: apply fade-in
+                    clip_with_fadein = apply_fadein_effect(
+                        clip,
+                        duration=fade_in_duration,
+                        apply_audio=apply_audio_fadein
+                    )
+                    clips.append(clip_with_fadein)
+
+            except Exception as e:
+                # Clean up on error
+                for clip in cleanup_clips:
+                    try:
+                        clip.close()
+                    except Exception:
+                        pass
+                return {
+                    "status": "error",
+                    "message": f"Failed to load video {path}: {str(e)}"
+                }
+
+        # Concatenate all clips
+        try:
+            final_clip = mpy.concatenate_videoclips(clips, method="compose")
+        except Exception:
+            # Fallback to default method if 'compose' fails
+            try:
+                final_clip = mpy.concatenate_videoclips(clips)
+            except Exception as e:
+                # Clean up
+                for clip in cleanup_clips:
+                    try:
+                        clip.close()
+                    except Exception:
+                        pass
+                return {
+                    "status": "error",
+                    "message": f"Failed to concatenate videos: {str(e)}"
+                }
+
+        total_duration = float(getattr(final_clip, "duration", 0) or 0)
+
+        # Write output video
+        try:
+            # Create output directory if needed
+            output_dir = os.path.dirname(output_path)
+            if output_dir and not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+
+            # Use ffmpeg settings similar to render_video_moviepy
+            ffmpeg_exe = os.environ.get("IMAGEIO_FFMPEG_EXE")
+            if ffmpeg_exe:
+                final_clip.write_videofile(
+                    output_path,
+                    fps=30,
+                    codec="libx264",
+                    audio_codec="aac",
+                    threads=4,
+                    preset="medium",
+                )
+            else:
+                # Fallback: simple call
+                final_clip.write_videofile(output_path, fps=30)
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to write output video: {str(e)}"
+            }
+
+        finally:
+            # Clean up all clips
+            try:
+                final_clip.close()
+            except Exception:
+                pass
+
+            for clip in cleanup_clips:
+                try:
+                    clip.close()
+                except Exception:
+                    pass
+
+        return {
+            "status": "ok",
+            "output": output_path,
+            "clips_count": len(clips),
+            "total_duration": total_duration,
+        }
+
+    except Exception as e:
+        # Catch-all error handler
+        for clip in cleanup_clips:
+            try:
+                clip.close()
+            except Exception:
+                pass
+
+        return {
+            "status": "error",
+            "message": f"Unexpected error during concatenation: {str(e)}"
+        }

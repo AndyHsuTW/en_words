@@ -157,3 +157,83 @@ def validate_paths(config: VideoConfig) -> Dict[str, str]:
             errors["music_path"] = "music must be .mp3, .wav, or .m4a"
 
     return errors
+
+
+def check_assets_dict(item: Dict[str, Any]) -> Dict[str, Any]:
+    """檢查視頻資源檔案(字典參數版本,向後相容)
+
+    Args:
+        item: 視頻配置字典,包含:
+            - image_path: 圖片路徑
+            - music_path: 音訊路徑
+            - letters: 字母字串
+            - letters_as_image: 是否使用圖片模式
+
+    Returns:
+        資源檢查結果字典:
+        - image_exists: bool
+        - music_exists: bool
+        - letters_mode: str ("image" or "text")
+        - letters_assets: List[str]
+        - letters_missing: List[str]
+        - letters_missing_details: List[Dict]
+        - letters_asset_dir: str
+        - letters_has_letters: bool
+
+    Example:
+        >>> item = {
+        ...     "letters": "A a",
+        ...     "word_en": "Apple",
+        ...     "word_zh": "蘋果",
+        ...     "image_path": "assets/apple.png"
+        ... }
+        >>> result = check_assets_dict(item)
+        >>> result["image_exists"]
+        False
+    """
+    import os
+    from spellvid.application.context_builder import (
+        prepare_letters_context,
+        resolve_letter_asset_dir,
+    )
+
+    res: Dict[str, Any] = {
+        "image_exists": False,
+        "music_exists": False,
+        "letters_mode": None,
+        "letters_assets": [],
+        "letters_missing": [],
+        "letters_missing_details": [],
+        "letters_asset_dir": None,
+        "letters_has_letters": False,
+    }
+
+    # Check image file
+    if os.path.isfile(item.get("image_path", "")):
+        res["image_exists"] = True
+
+    # Check music file
+    if os.path.isfile(item.get("music_path", "")):
+        res["music_exists"] = True
+
+    # Check letters resources
+    try:
+        letters_ctx = prepare_letters_context(item)
+    except Exception:
+        # Fallback if context preparation fails
+        letters_ctx = {
+            "mode": item.get("letters_as_image", True) and "image" or "text",
+            "filenames": [],
+            "missing_names": [],
+            "asset_dir": resolve_letter_asset_dir(item),
+            "has_letters": bool(str(item.get("letters", "")).strip()),
+        }
+
+    res["letters_mode"] = letters_ctx.get("mode")
+    res["letters_assets"] = list(letters_ctx.get("filenames", []))
+    res["letters_missing"] = list(letters_ctx.get("missing_names", []))
+    res["letters_missing_details"] = list(letters_ctx.get("missing", []))
+    res["letters_asset_dir"] = letters_ctx.get("asset_dir")
+    res["letters_has_letters"] = bool(letters_ctx.get("has_letters"))
+
+    return res

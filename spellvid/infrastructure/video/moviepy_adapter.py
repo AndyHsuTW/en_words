@@ -247,3 +247,299 @@ class MoviePyAdapter:
             return concatenate_videoclips(clips, method="compose")
         else:
             raise ValueError(f"不支援的串接方法: {method}")
+
+
+# ============================================================================
+# Module-level utility functions for clip manipulation
+# ============================================================================
+
+def _ensure_dimensions(clip: Any) -> Any:
+    """Ensure clip dimensions are exactly 1920x1080.
+
+    If clip size differs from target, resizes using MoviePy's resized method.
+    Silently returns original clip if:
+    - Size attribute is missing
+    - Size is already 1920x1080
+    - Resize operation fails
+
+    Args:
+        clip: MoviePy VideoClip object with optional size attribute
+
+    Returns:
+        Resized clip (1920x1080) or original clip on error
+    """
+    try:
+        size = getattr(clip, "size", None)
+        if size:
+            w, h = int(size[0]), int(size[1])
+            if (w, h) != (1920, 1080):
+                try:
+                    clip = clip.resized(new_size=(1920, 1080))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return clip
+
+
+def _ensure_fullscreen_cover(clip: Any) -> Any:
+    """Resize clip to fill 1920x1080 frame without maintaining aspect ratio.
+
+    Always performs non-proportional resize to exact dimensions, stretching
+    content to fill the entire frame. Unlike _ensure_dimensions, this function
+    guarantees full coverage without letterboxing or pillarboxing.
+
+    Args:
+        clip: MoviePy VideoClip object with optional size attribute
+
+    Returns:
+        Stretched clip (1920x1080) or original clip on error
+    """
+    try:
+        size = getattr(clip, "size", None)
+        if not size:
+            return clip
+        w, h = float(size[0]), float(size[1])
+        if w <= 0 or h <= 0:
+            return clip
+        target_w, target_h = 1920.0, 1080.0
+        # 總是執行非等比例縮放,確保完整畫面無裁剪
+        try:
+            clip = clip.resized(new_size=(int(target_w), int(target_h)))
+        except Exception:
+            return clip
+    except Exception:
+        pass
+    return clip
+
+
+def _auto_letterbox_crop(clip: Any) -> Any:
+    """Automatically detect and crop letterbox/pillarbox bars from video clip.
+
+    Samples frames at t=0 and t=duration/2 to detect black/dark bars
+    (gray value < 15.0). If bars are found with sufficient content area,
+    crops clip to content bounding box with 2-pixel padding.
+
+    Algorithm:
+    1. Extract frame at t=0 (and t=duration/2 if duration > 0.5s)
+    2. Convert to grayscale (mean across color channels if RGB)
+    3. Threshold: pixels with gray > 15.0 are considered content
+    4. Find bounding box of valid content pixels
+    5. If box is smaller than frame (>2px margins), apply crop
+    6. Add 2-pixel padding to prevent edge artifacts
+
+    Args:
+        clip: MoviePy VideoClip object with get_frame method
+
+    Returns:
+        Cropped clip (content bounding box) or original clip if:
+        - Frame extraction fails
+        - No valid content detected (all dark)
+        - Content already fills frame (no significant bars)
+        - Any error occurs during processing
+
+    Raises:
+        No exceptions raised - all errors handled silently
+    """
+    try:
+        # Sample frames at start and middle to detect bars
+        sample_points = [0.0]
+        try:
+            dur = float(getattr(clip, "duration", 0.0) or 0.0)
+        except Exception:
+            dur = 0.0
+        if dur > 0.5:
+            sample_points.append(max(0.0, dur / 2.0))
+
+        # Try to get a valid frame
+        frame = None
+        for t in sample_points:
+            try:
+                frame = clip.get_frame(t)
+                if frame is not None:
+                    break
+            except Exception:
+                frame = None
+        if frame is None:
+            return clip
+
+        # Convert to numpy array and detect content
+        arr = np.asarray(frame)
+        if arr.ndim == 3:
+            # RGB/RGBA - convert to grayscale by averaging channels
+            gray = arr.mean(axis=2)
+        else:
+            # Already grayscale
+            gray = arr.astype(float)
+
+        # Threshold: pixels with gray > 15.0 are considered content
+        valid = gray > 15.0
+        if not valid.any():
+            # All pixels are dark - cannot determine content area
+            return clip
+
+        # Find bounding box of valid content
+        rows = np.where(valid.any(axis=1))[0]
+        cols = np.where(valid.any(axis=0))[0]
+        if rows.size == 0 or cols.size == 0:
+            return clip
+
+        top, bottom = int(rows[0]), int(rows[-1])
+        left, right = int(cols[0]), int(cols[-1])
+
+        # Check if content already fills frame (no significant bars)
+        if (top <= 2 and left <= 2 and
+                bottom >= arr.shape[0] - 3 and right >= arr.shape[1] - 3):
+            return clip
+
+        # Add 2-pixel padding to prevent edge artifacts
+        pad = 2
+        top = max(0, top - pad)
+        left = max(0, left - pad)
+        bottom = min(arr.shape[0] - 1, bottom + pad)
+        right = min(arr.shape[1] - 1, right + pad)
+
+        # Apply crop using MoviePy's cropped method
+        # Note: x2/y2 are exclusive, hence +1
+        return clip.cropped(
+            x1=float(left),
+            y1=float(top),
+            x2=float(right + 1),
+            y2=float(bottom + 1)
+        )
+    except Exception:
+        # Any error during processing - return original clip
+        return clip
+
+
+def _make_fixed_letter_clip(
+    letter: str,
+    fixed_size: tuple,
+    font_size: int = 128,
+    color=(0, 0, 0),
+    duration: float = None,
+    prefer_cjk: bool = False,
+):
+    """Render a single letter centered on a fixed transparent canvas.
+
+    Creates an ImageClip with a letter centered on a fixed-size transparent
+    background. This ensures per-letter clips have identical dimensions,
+    preventing layout shifts when letters appear/disappear in animations.
+
+    Implementation delegates to the Pillow adapter's _make_text_imageclip
+    which handles the actual rendering with fixed_size parameter.
+
+    Args:
+        letter: Single character to render
+        fixed_size: (width, height) tuple for canvas dimensions
+        font_size: Font size in pixels (default: 128)
+        color: RGB tuple for text color (default: black (0,0,0))
+        duration: Clip duration in seconds (None = image clip)
+        prefer_cjk: If True, prefer CJK fonts over Western fonts
+
+    Returns:
+        MoviePy ImageClip with letter centered on fixed-size canvas
+
+    Example:
+        >>> clip = _make_fixed_letter_clip('A', (200, 200), font_size=96)
+        >>> clip.size
+        (200, 200)
+    """
+    # Import here to avoid circular dependency
+    from spellvid.infrastructure.rendering.pillow_adapter import (
+        _make_text_imageclip
+    )
+
+    return _make_text_imageclip(
+        text=letter,
+        font_size=font_size,
+        color=color,
+        duration=duration,
+        prefer_cjk=prefer_cjk,
+        extra_bottom=0,
+        fixed_size=fixed_size,
+    )
+
+
+def _create_placeholder_mp4_with_ffmpeg(out_path: str) -> bool:
+    """Create a minimal valid MP4 file using FFmpeg.
+
+    Generates a 1-second white frame video (1920x1080) encoded with H.264.
+    Uses Pillow to create the frame and FFmpeg for encoding.
+
+    This is useful for creating placeholder videos or testing video pipelines
+    without requiring actual video content. The output uses faststart flag
+    to ensure the moov atom is at file start for web streaming compatibility.
+
+    Args:
+        out_path: Absolute path for output MP4 file
+
+    Returns:
+        True if MP4 was successfully created, False otherwise
+
+    Raises:
+        No exceptions raised - all errors handled silently and return False
+
+    Technical details:
+        - Frame: 1920x1080 white RGB (255,255,255)
+        - Duration: 1 second
+        - Codec: libx264 with yuv420p pixel format
+        - Flags: +faststart for web optimization
+        - FFmpeg resolution: Checks IMAGEIO_FFMPEG_EXE env var, then PATH
+
+    Example:
+        >>> success = _create_placeholder_mp4_with_ffmpeg("test.mp4")
+        >>> if success:
+        ...     print("Placeholder created successfully")
+    """
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    try:
+        # Locate FFmpeg executable
+        ffmpeg = os.environ.get("IMAGEIO_FFMPEG_EXE") or shutil.which("ffmpeg")
+        if not ffmpeg:
+            return False
+
+        # Create a single white frame PNG and encode to mp4
+        # (use +faststart to ensure moov atom is at file start)
+        with tempfile.TemporaryDirectory() as td:
+            png = os.path.join(td, "frame.png")
+            try:
+                from PIL import Image
+
+                img = Image.new("RGB", (1920, 1080), (255, 255, 255))
+                img.save(png, "PNG")
+            except Exception:
+                return False
+
+            cmd = [
+                ffmpeg,
+                "-y",  # Overwrite output file
+                "-loop",
+                "1",  # Loop input
+                "-i",
+                png,  # Input frame
+                "-t",
+                "1",  # Duration 1 second
+                "-vf",
+                "scale=1920:1080",  # Ensure resolution
+                "-c:v",
+                "libx264",  # H.264 codec
+                "-pix_fmt",
+                "yuv420p",  # Standard pixel format
+                "-movflags",
+                "+faststart",  # Web optimization
+                out_path,
+            ]
+            subprocess.run(
+                cmd,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        return True
+    except Exception:
+        return False

@@ -299,13 +299,13 @@
   {
     "function_name": "_prepare_entry_context",
     "old_location": "spellvid/utils.py",
-    "new_location": "spellvid/application/video_service.py",
+    "new_location": "spellvid/application/context_builder.py",
     "category": "production",
     "call_count": 6,
-    "wrapper_needed": false,
+    "wrapper_needed": true,
     "migration_priority": "medium",
     "dependencies": [],
-    "notes": ""
+    "notes": "Migrated to context_builder.py as prepare_entry_context"
   },
   {
     "function_name": "_resolve_ending_video_path",
@@ -332,46 +332,46 @@
   {
     "function_name": "_prepare_ending_context",
     "old_location": "spellvid/utils.py",
-    "new_location": "spellvid/application/video_service.py",
+    "new_location": "spellvid/application/context_builder.py",
     "category": "production",
     "call_count": 6,
-    "wrapper_needed": false,
+    "wrapper_needed": true,
     "migration_priority": "medium",
     "dependencies": [],
-    "notes": ""
+    "notes": "Migrated to context_builder.py as prepare_ending_context"
   },
   {
     "function_name": "_resolve_letter_asset_dir",
     "old_location": "spellvid/utils.py",
-    "new_location": "spellvid/application/video_service.py",
+    "new_location": "spellvid/application/context_builder.py",
     "category": "production",
     "call_count": 8,
-    "wrapper_needed": false,
+    "wrapper_needed": true,
     "migration_priority": "medium",
     "dependencies": [],
-    "notes": ""
+    "notes": "Migrated to context_builder.py as resolve_letter_asset_dir"
   },
   {
     "function_name": "_prepare_letters_context",
     "old_location": "spellvid/utils.py",
-    "new_location": "spellvid/application/video_service.py",
+    "new_location": "spellvid/application/context_builder.py",
     "category": "production",
     "call_count": 12,
-    "wrapper_needed": false,
+    "wrapper_needed": true,
     "migration_priority": "high",
     "dependencies": [],
-    "notes": ""
+    "notes": "Migrated to context_builder.py as prepare_letters_context"
   },
   {
     "function_name": "_log_missing_letter_assets",
     "old_location": "spellvid/utils.py",
-    "new_location": "spellvid/application/video_service.py",
+    "new_location": "spellvid/application/context_builder.py",
     "category": "production",
     "call_count": 6,
-    "wrapper_needed": false,
+    "wrapper_needed": true,
     "migration_priority": "medium",
     "dependencies": [],
-    "notes": ""
+    "notes": "Migrated to context_builder.py as log_missing_letter_assets"
   },
   {
     "function_name": "render_video_moviepy",

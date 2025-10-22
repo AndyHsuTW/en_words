@@ -359,3 +359,208 @@ class FFmpegWrapper:
                 return candidate
 
         return None
+
+
+# ============================================================================
+# Module-level utility functions for legacy compatibility
+# ============================================================================
+
+# Global cache for media duration probing (filepath -> (mtime, duration))
+_entry_probe_cache: dict[str, tuple[float, float | None]] = {}
+
+
+def _probe_media_duration(path: str) -> float | None:
+    """Best-effort probe for a media file duration in seconds.
+
+    This function attempts to retrieve the duration of a media file using:
+    1. In-memory cache (based on file mtime)
+    2. MoviePy VideoFileClip (if available)
+    3. ffprobe subprocess fallback
+
+    Cache Strategy:
+        Results are cached based on file path + modification time.
+        If file hasn't changed (same mtime), cached duration is returned.
+
+    FFprobe Discovery:
+        Searches for ffprobe in this order:
+        1. System PATH (shutil.which)
+        2. Repo-local FFmpeg/ffprobe[.exe]
+
+    Args:
+        path: Absolute path to media file (video or audio)
+
+    Returns:
+        Duration in seconds (float), or None if:
+        - File doesn't exist
+        - Duration cannot be determined
+        - Duration is negative (invalid)
+
+    Example:
+        >>> duration = _probe_media_duration("assets/music.mp3")
+        >>> if duration:
+        ...     print(f"Duration: {duration:.2f}s")
+        Duration: 183.52s
+    """
+    import os
+    import shutil
+    import subprocess
+
+    if not path or not os.path.isfile(path):
+        return None
+
+    # Get file modification time for cache validation
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+
+    # Check cache
+    cache_key = os.path.abspath(path)
+    cached = _entry_probe_cache.get(cache_key)
+    if cached and cached[0] == mtime:
+        return cached[1]
+
+    duration: float | None = None
+
+    # Try MoviePy first if available
+    try:
+        import moviepy as mpy  # type: ignore
+        _HAS_MOVIEPY = True
+    except ImportError:
+        _HAS_MOVIEPY = False
+
+    if _HAS_MOVIEPY:
+        try:
+            clip = mpy.VideoFileClip(path)  # type: ignore
+            try:
+                raw = getattr(clip, "duration", None)
+                if raw is not None:
+                    duration = float(raw)
+            finally:
+                try:
+                    clip.close()
+                except Exception:
+                    pass
+        except Exception:
+            duration = None
+
+    # Fallback to ffprobe if MoviePy failed or unavailable
+    if duration is None:
+        candidates = [
+            shutil.which("ffprobe"),
+            shutil.which("ffprobe.exe"),
+            None,
+        ]
+        # Check repo-local FFmpeg directory
+        ffmpeg_dir = os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "FFmpeg"
+        )
+        for exe in ("ffprobe", "ffprobe.exe"):
+            candidate = os.path.join(ffmpeg_dir, exe)
+            if os.path.isfile(candidate):
+                candidates.append(candidate)
+
+        for cand in candidates:
+            if not cand:
+                continue
+            cmd = [
+                cand,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                path,
+            ]
+            try:
+                out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                text = out.decode("utf-8", errors="ignore").strip()
+                if text:
+                    duration = float(text)
+                    break
+            except Exception:
+                continue
+
+    # Validate duration (reject negative values)
+    if duration is not None and duration < 0:
+        duration = None
+
+    # Update cache
+    _entry_probe_cache[cache_key] = (mtime, duration)
+    return duration
+
+
+def _find_and_set_ffmpeg():
+    """Locate ffmpeg and set IMAGEIO_FFMPEG_EXE and moviepy config when found.
+
+    This function searches for ffmpeg executable and configures environment
+    variables and MoviePy settings to use the located ffmpeg.
+
+    Search Priority:
+        1. Environment variable: FFMPEG_PATH or IMAGEIO_FFMPEG_EXE
+           - If points to ffprobe, tries sibling ffmpeg.exe
+        2. Repo-local: ../../../FFmpeg/ffmpeg.exe (relative to this file)
+        3. imageio_ffmpeg.get_ffmpeg_exe() (if package installed)
+
+    Side Effects:
+        - Sets IMAGEIO_FFMPEG_EXE environment variable
+        - Updates MoviePy config FFMPEG_BINARY (if MoviePy available)
+
+    Usage:
+        This function is typically called once at module initialization:
+        >>> _find_and_set_ffmpeg()  # Auto-configure ffmpeg
+
+    Notes:
+        - Silent on failure (no exceptions raised)
+        - Only sets env var if ffmpeg file actually exists
+        - Handles both POSIX and Windows executables (.exe)
+    """
+    import os
+
+    # 1: Check environment variables
+    ffmpeg_path = os.environ.get("FFMPEG_PATH")
+    if not ffmpeg_path:
+        ffmpeg_path = os.environ.get("IMAGEIO_FFMPEG_EXE")
+
+    if ffmpeg_path:
+        # If user accidentally pointed to ffprobe, try sibling ffmpeg.exe
+        base = os.path.basename(ffmpeg_path).lower()
+        if "ffprobe" in base:
+            candidate = os.path.join(
+                os.path.dirname(ffmpeg_path), "ffmpeg.exe"
+            )
+            if os.path.isfile(candidate):
+                ffmpeg_path = candidate
+
+    # 2: Check repo-local FFmpeg directory
+    if not ffmpeg_path:
+        root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..")
+        )
+        candidate = os.path.join(root, "FFmpeg", "ffmpeg.exe")
+        if os.path.isfile(candidate):
+            ffmpeg_path = candidate
+
+    # 3: Try imageio-ffmpeg package
+    if not ffmpeg_path:
+        try:
+            import imageio_ffmpeg as _iioff  # type: ignore
+
+            exe = _iioff.get_ffmpeg_exe()
+            if exe:
+                ffmpeg_path = exe
+        except Exception:
+            pass
+
+    # Set environment variable and MoviePy config if found
+    if ffmpeg_path and os.path.isfile(ffmpeg_path):
+        os.environ.setdefault("IMAGEIO_FFMPEG_EXE", ffmpeg_path)
+
+        # Try to configure MoviePy if available
+        try:
+            import moviepy.config as _mpy_config  # type: ignore
+            if _mpy_config is not None:
+                _mpy_config.change_settings({"FFMPEG_BINARY": ffmpeg_path})
+        except Exception:
+            pass

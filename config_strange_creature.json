@@ -50,33 +50,13 @@
 		"video_mode": "cover"
 	},
 	{
-		"letters": "Ll",
-		"word_en": "Lion",
-		"word_zh": "獅子",
-		"image_path": "assets/lion.mp4",
-		"music_path": "assets/lion_60s.mp3",
+		"letters": "Ff",
+		"word_en": "Frog Tire",
+		"word_zh": "青蛙輪胎",
+		"image_path": "assets/frog.mp4",
+		"music_path": "assets/frog_60s.mp3",
 		"countdown_sec": 10,
 		"reveal_hold_sec": 26,
-		"video_mode": "cover"
-	},
-	{
-		"letters": "Tt",
-		"word_en": "Turtle",
-		"word_zh": "烏龜",
-		"image_path": "assets/turtle.mp4",
-		"music_path": "assets/turtle_60s.mp3",
-		"countdown_sec": 10,
-		"reveal_hold_sec": 23,
-		"video_mode": "cover"
-	},
-	{
-		"letters": "Tt",
-		"word_en": "Tiger",
-		"word_zh": "老虎",
-		"image_path": "assets/tiger.mp4",
-		"music_path": "assets/tiger_60s.mp3",
-		"countdown_sec": 10,
-		"reveal_hold_sec": 25,
 		"video_mode": "cover"
 	}
 ]

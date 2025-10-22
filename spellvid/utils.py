@@ -108,220 +108,127 @@ FADE_IN_DURATION = 1.0   # seconds - duration of fade from black at video start
 
 
 def _coerce_non_negative_float(value: Any, default: float = 0.0) -> float:
-    try:
-        fv = float(value)
-    except (TypeError, ValueError):
-        return float(default)
-    if fv < 0:
-        return 0.0
-    if not (fv < float("inf")):
-        return float(default)
-    return float(fv)
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder._coerce_non_negative_float
+    """
+    from spellvid.application.context_builder import (
+        _coerce_non_negative_float as _impl
+    )
+    return _impl(value, default)
 
 
 def _resolve_entry_video_path(item: Dict[str, Any] | None = None) -> str:
-    if item:
-        override = item.get("entry_video_path") or item.get("entry_path")
-        if override:
-            return os.path.abspath(str(override))
-    env_override = os.environ.get("SPELLVID_ENTRY_VIDEO_PATH")
-    if env_override:
-        return os.path.abspath(env_override)
-    return _DEFAULT_ENTRY_VIDEO_PATH
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder._resolve_entry_video_path
+    """
+    from spellvid.application.context_builder import (
+        _resolve_entry_video_path as _impl
+    )
+    return _impl(item)
 
 
 def _is_entry_enabled(item: Dict[str, Any] | None = None) -> bool:
-    if not item:
-        return True
-    if "entry_enabled" in item:
-        return _coerce_bool(item.get("entry_enabled"), True)
-    if "entry_disabled" in item:
-        return not _coerce_bool(item.get("entry_disabled"), False)
-    return True
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder._is_entry_enabled
+    """
+    from spellvid.application.context_builder import (
+        _is_entry_enabled as _impl
+    )
+    return _impl(item)
 
 
 def _resolve_ending_video_path(item: Dict[str, Any] | None = None) -> str:
-    if item:
-        override = item.get("ending_video_path") or item.get("ending_path")
-        if override:
-            return os.path.abspath(str(override))
-    env_override = os.environ.get("SPELLVID_ENDING_VIDEO_PATH")
-    if env_override:
-        return os.path.abspath(env_override)
-    return _DEFAULT_ENDING_VIDEO_PATH
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder._resolve_ending_video_path
+    """
+    from spellvid.application.context_builder import (
+        _resolve_ending_video_path as _impl
+    )
+    return _impl(item)
 
 
 def _is_ending_enabled(item: Dict[str, Any] | None = None) -> bool:
-    if not item:
-        return True
-    if "ending_enabled" in item:
-        return _coerce_bool(item.get("ending_enabled"), True)
-    if "ending_disabled" in item:
-        return not _coerce_bool(item.get("ending_disabled"), False)
-    return True
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder._is_ending_enabled
+    """
+    from spellvid.application.context_builder import (
+        _is_ending_enabled as _impl
+    )
+    return _impl(item)
 
 
 _entry_probe_cache: Dict[str, Tuple[float, Optional[float]]] = {}
 
 
 def _probe_media_duration(path: str) -> Optional[float]:
-    """Best-effort probe for a media file duration in seconds."""
-    if not path or not os.path.isfile(path):
-        return None
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    try:
-        mtime = os.path.getmtime(path)
-    except OSError:
-        mtime = 0.0
-
-    cache_key = os.path.abspath(path)
-    cached = _entry_probe_cache.get(cache_key)
-    if cached and cached[0] == mtime:
-        return cached[1]
-
-    duration: Optional[float] = None
-
-    if _HAS_MOVIEPY:
-        try:
-            clip = _mpy.VideoFileClip(path)
-            try:
-                raw = getattr(clip, "duration", None)
-                if raw is not None:
-                    duration = float(raw)
-            finally:
-                try:
-                    clip.close()
-                except Exception:
-                    pass
-        except Exception:
-            duration = None
-
-    if duration is None:
-        candidates = [
-            shutil.which("ffprobe"),
-            shutil.which("ffprobe.exe"),
-            None,
-        ]
-        ffmpeg_dir = os.path.join(os.path.dirname(__file__), "..", "FFmpeg")
-        for exe in ("ffprobe", "ffprobe.exe"):
-            candidate = os.path.join(ffmpeg_dir, exe)
-            if os.path.isfile(candidate):
-                candidates.append(candidate)
-        for cand in candidates:
-            if not cand:
-                continue
-            cmd = [
-                cand,
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                path,
-            ]
-            try:
-                out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                text = out.decode("utf-8", errors="ignore").strip()
-                if text:
-                    duration = float(text)
-                    break
-            except Exception:
-                continue
-
-    if duration is not None and duration < 0:
-        duration = None
-
-    _entry_probe_cache[cache_key] = (mtime, duration)
-    return duration
+    使用 infrastructure.media.ffmpeg_wrapper._probe_media_duration
+    """
+    from spellvid.infrastructure.media.ffmpeg_wrapper import (
+        _probe_media_duration as _impl
+    )
+    return _impl(path)
 
 
 def _prepare_entry_context(item: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    path = _resolve_entry_video_path(item)
-    enabled = _is_entry_enabled(item)
-    if not enabled:
-        return {
-            "path": path,
-            "exists": False,
-            "duration_sec": 0.0,
-            "hold_sec": 0.0,
-            "total_lead_sec": 0.0,
-            "enabled": False,
-        }
-    exists = os.path.isfile(path)
-    hold = _coerce_non_negative_float(
-        (item or {}).get("entry_hold_sec"), default=0.0
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder.prepare_entry_context
+    """
+    from spellvid.application.context_builder import (
+        prepare_entry_context as _impl
     )
-    duration = _probe_media_duration(path) if exists else None
-    total_lead = (duration or 0.0) + hold
-    return {
-        "path": path,
-        "exists": bool(exists),
-        "duration_sec": duration,
-        "hold_sec": hold,
-        "total_lead_sec": total_lead,
-        "enabled": True,
-    }
+    return _impl(item)
 
 
 def _prepare_ending_context(item: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    path = _resolve_ending_video_path(item)
-    enabled = _is_ending_enabled(item)
-    if not enabled:
-        return {
-            "path": path,
-            "exists": False,
-            "duration_sec": 0.0,
-            "total_tail_sec": 0.0,
-            "enabled": False,
-        }
-    exists = os.path.isfile(path)
-    duration = _probe_media_duration(path) if exists else None
-    total_tail = float(duration or 0.0) if duration else 0.0
-    return {
-        "path": path,
-        "exists": bool(exists),
-        "duration_sec": duration,
-        "total_tail_sec": total_tail,
-        "enabled": True,
-    }
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder.prepare_ending_context
+    """
+    from spellvid.application.context_builder import (
+        prepare_ending_context as _impl
+    )
+    return _impl(item)
 
 
 def _resolve_letter_asset_dir(item: Dict[str, Any] | None = None) -> str:
-    override = None
-    if item:
-        override = item.get("letters_asset_dir") or item.get(
-            "letters_assets_dir")
-    if not override:
-        override = os.environ.get("SPELLVID_LETTER_ASSET_DIR")
-    if override:
-        try:
-            return os.path.abspath(str(override))
-        except Exception:
-            return os.path.abspath(str(override))
-    return _DEFAULT_LETTER_ASSET_DIR
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder.resolve_letter_asset_dir
+    """
+    from spellvid.application.context_builder import (
+        resolve_letter_asset_dir as _impl
+    )
+    return _impl(item)
 
 
 def _normalize_letters_sequence(letters: str) -> List[str]:
-    if not letters:
-        return []
-    seq: List[str] = []
-    for ch in letters:
-        if not ch or ch.isspace():
-            continue
-        seq.append(ch)
-    return seq
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 domain.layout._normalize_letters_sequence
+    """
+    from spellvid.domain.layout import (
+        _normalize_letters_sequence as _impl
+    )
+    return _impl(letters)
 
 
 def _letter_asset_filename(ch: str) -> Optional[str]:
-    if not ch:
-        return None
-    if ch.isalpha():
-        if ch.isupper():
-            return f"{ch}.png"
-        if ch.islower():
-            return f"{ch}_small.png"
-    return None
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 domain.layout._letter_asset_filename
+    """
+    from spellvid.domain.layout import (
+        _letter_asset_filename as _impl
+    )
+    return _impl(ch)
 
 
 def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
@@ -374,149 +281,91 @@ def _plan_letter_images(letters: str, asset_dir: str) -> Dict[str, Any]:
 
 
 def _letters_missing_names(missing: List[Dict[str, Any]]) -> List[str]:
-    names: List[str] = []
-    for entry in missing or []:
-        name = entry.get("filename") or entry.get("char")
-        if name:
-            name_str = str(name)
-            if name_str not in names:
-                names.append(name_str)
-    return names
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 domain.layout._letters_missing_names
+    """
+    from spellvid.domain.layout import (
+        _letters_missing_names as _impl
+    )
+    return _impl(missing)
 
 
 def _prepare_letters_context(item: Dict[str, Any]) -> Dict[str, Any]:
-    letters_text = str(item.get("letters", "") or "")
-    asset_dir = _resolve_letter_asset_dir(item)
-    mode = "image" if _coerce_bool(
-        item.get("letters_as_image", True)) else "text"
-    has_letters = bool(letters_text.strip())
-    layout = {"letters": [], "missing": [], "gap": 0, "bbox": {"w": 0, "h": 0}}
-    missing: List[Dict[str, Any]] = []
-    if has_letters and mode == "image":
-        layout = _plan_letter_images(letters_text, asset_dir)
-        missing = layout.get("missing", [])
-    filenames = [entry.get("filename") for entry in layout.get("letters", [])]
-    missing_names = _letters_missing_names(missing)
-    return {
-        "letters": letters_text,
-        "mode": mode,
-        "asset_dir": asset_dir,
-        "layout": layout,
-        "filenames": filenames,
-        "missing": missing,
-        "missing_names": missing_names,
-        "has_letters": has_letters,
-    }
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder.prepare_letters_context
+    """
+    from spellvid.application.context_builder import (
+        prepare_letters_context as _impl
+    )
+    return _impl(item)
 
 
 def _log_missing_letter_assets(missing: List[Dict[str, Any]]) -> None:
-    if not missing:
-        return
-    for entry in missing:
-        name = entry.get("filename") or entry.get("char") or "?"
-        path = entry.get("path")
-        reason = entry.get("reason") or "unavailable"
-        if path:
-            print(
-                f"WARNING: letters asset missing {name} ({reason}) at {path}")
-        else:
-            print(f"WARNING: letters asset missing {name} ({reason})")
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder.log_missing_letter_assets
+    """
+    from spellvid.application.context_builder import (
+        log_missing_letter_assets as _impl
+    )
+    return _impl(missing)
 
 
 def _coerce_bool(value: Any, default: bool = True) -> bool:
-    """Return a boolean, accepting common string/int representations."""
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.context_builder._coerce_bool
+
+    Note: 新實作簽名略有不同,但行為相容
+    """
+    from spellvid.application.context_builder import (
+        _coerce_bool as _impl
+    )
+    # 舊版有 default 參數,新版沒有,需要適配
     if value is None:
         return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    if isinstance(value, str):
-        val = value.strip().lower()
-        if not val:
-            return default
-        if val in {"false", "0", "off", "no", "n"}:
-            return False
-        if val in {"true", "1", "on", "yes", "y"}:
-            return True
-    return bool(value)
+    return _impl(value)
 
 
 def _progress_bar_band_layout(bar_width: int) -> List[Dict[str, Any]]:
-    """Return color bands with absolute pixel spans for the progress bar."""
-    order = ("safe", "warn", "danger")
-    layout: List[Dict[str, Any]] = []
-    cursor = 0
-    for idx, key in enumerate(order):
-        if idx == len(order) - 1:
-            end = bar_width
-        else:
-            width = int(round(bar_width * PROGRESS_BAR_RATIOS[key]))
-            end = min(bar_width, cursor + width)
-        end = max(cursor, end)
-        layout.append(
-            {
-                "name": key,
-                "color": PROGRESS_BAR_COLORS[key],
-                "start": cursor,
-                "end": end,
-            }
-        )
-        cursor = end
-    if layout:
-        layout[-1]["end"] = bar_width
-    return layout
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 infrastructure.ui.progress_bar.calculate_band_layout
+    """
+    from spellvid.infrastructure.ui.progress_bar import (
+        calculate_band_layout as _impl,
+    )
+
+    return _impl(bar_width)
 
 
 _progress_bar_cache: Dict[int, Tuple[_np.ndarray, _np.ndarray]] = {}
 
 
-def _progress_bar_base_arrays(bar_width: int) -> Tuple[_np.ndarray, _np.ndarray]:
-    """Return (color_rgb, alpha_mask) arrays for the segmented progress bar."""
-    cached = _progress_bar_cache.get(bar_width)
-    if cached:
-        return cached
-    height = PROGRESS_BAR_HEIGHT
-    color = _np.zeros((height, bar_width, 3), dtype=_np.uint8)
-    layout = _progress_bar_band_layout(bar_width)
-    for band in layout:
-        start = max(0, int(band["start"]))
-        end = max(start, min(bar_width, int(band["end"])))
-        if end <= start:
-            continue
-        color[:, start:end, 0] = band["color"][0]
-        color[:, start:end, 1] = band["color"][1]
-        color[:, start:end, 2] = band["color"][2]
-    mask_img = Image.new("L", (bar_width, height), 0)
-    draw = ImageDraw.Draw(mask_img)
-    draw.rounded_rectangle(
-        (0, 0, bar_width - 1, height - 1),
-        radius=PROGRESS_BAR_CORNER_RADIUS,
-        fill=255,
+def _progress_bar_base_arrays(
+    bar_width: int,
+) -> Tuple[_np.ndarray, _np.ndarray]:
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 infrastructure.ui.progress_bar.generate_base_arrays
+    """
+    from spellvid.infrastructure.ui.progress_bar import (
+        generate_base_arrays as _impl,
     )
-    mask = _np.array(mask_img, dtype=_np.uint8)
-    _progress_bar_cache[bar_width] = (color, mask)
-    return color, mask
+
+    return _impl(bar_width)
 
 
 def _make_progress_bar_mask(mask_slice: _np.ndarray, duration: float):
-    """Create a MoviePy ImageClip mask from an alpha slice."""
-    mask_arr = (mask_slice.astype(_np.float32) / 255.0)
-    import inspect as _inspect
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    mask_kwargs = {}
-    try:
-        params = _inspect.signature(_mpy.ImageClip.__init__).parameters
-        if "is_mask" in params:
-            mask_kwargs["is_mask"] = True
-        elif "ismask" in params:
-            mask_kwargs["ismask"] = True
-    except Exception:
-        mask_kwargs["ismask"] = True
-    if not mask_kwargs:
-        mask_kwargs["ismask"] = True
-    clip = _mpy.ImageClip(mask_arr, **mask_kwargs).with_duration(duration)
-    return clip
+    使用 infrastructure.ui.progress_bar.create_mask_clip
+    """
+    from spellvid.infrastructure.ui.progress_bar import create_mask_clip as _impl
+
+    return _impl(mask_slice, duration)
 
 
 def _build_progress_bar_segments(
@@ -526,135 +375,27 @@ def _build_progress_bar_segments(
     fps: int = 10,
     bar_width: int = PROGRESS_BAR_WIDTH,
 ) -> List[Dict[str, Any]]:
-    """Plan progress bar slices (start, end, width, spans) across countdown."""
-    countdown = float(max(0.0, countdown))
-    total_duration = float(max(total_duration, countdown))
-    if fps <= 0 or bar_width <= 0:
-        return []
-    if countdown == 0.0:
-        return [
-            {
-                "start": 0.0,
-                "end": round(total_duration, 6),
-                "width": 0,
-                "x_start": bar_width,
-                "color_spans": [],
-                "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
-            }
-        ]
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    import math as _math_local
+    使用 infrastructure.ui.progress_bar.plan_segments
+    """
+    from spellvid.infrastructure.ui.progress_bar import plan_segments as _impl
 
-    layout = _progress_bar_band_layout(bar_width)
-    step_count = max(1, int(_math_local.ceil(countdown * float(fps))))
-    step = countdown / step_count
-    segments: List[Dict[str, Any]] = []
-    prev_width = bar_width
-    for idx in range(step_count):
-        start = min(countdown, idx * step)
-        end = min(countdown, (idx + 1) * step)
-        if end <= start:
-            continue
-        remaining = max(0.0, countdown - start)
-        ratio = remaining / countdown if countdown else 0.0
-        raw_width = int(round(bar_width * ratio))
-        visible_width = min(prev_width, max(0, raw_width))
-        if ratio > 0.0:
-            if prev_width > 0:
-                visible_width = max(1, visible_width)
-            else:
-                visible_width = 0
-        else:
-            visible_width = 0
-        x_start = bar_width - visible_width if visible_width > 0 else bar_width
-        color_spans: List[Dict[str, Any]] = []
-        if visible_width > 0:
-            span_start = x_start
-            span_end = x_start + visible_width
-            for band in layout:
-                overlap_start = max(span_start, band["start"])
-                overlap_end = min(span_end, band["end"])
-                if overlap_end > overlap_start:
-                    color_spans.append(
-                        {
-                            "color": band["color"],
-                            "start": int(overlap_start),
-                            "end": int(overlap_end),
-                        }
-                    )
-        segments.append(
-            {
-                "start": round(float(start), 6),
-                "end": round(float(end), 6),
-                "width": int(visible_width),
-                "x_start": int(x_start),
-                "color_spans": color_spans,
-                "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
-            }
-        )
-        prev_width = visible_width
-    segments.append(
-        {
-            "start": round(float(countdown), 6),
-            "end": round(float(total_duration), 6),
-            "width": 0,
-            "x_start": bar_width,
-            "color_spans": [],
-            "corner_radius": PROGRESS_BAR_CORNER_RADIUS,
-        }
-    )
-    return segments
+    return _impl(countdown, total_duration, fps=fps, bar_width=bar_width)
+
+
 # If MoviePy is available, try to configure which ffmpeg binary to use.
 
 
 def _find_and_set_ffmpeg():
-    """Locate ffmpeg and set IMAGEIO_FFMPEG_EXE and moviepy config when found.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-     Priority:
-     1) environment FFMPEG_PATH (if given and points to ffprobe,
-         try sibling ffmpeg)
-     2) repo-local FFmpeg/ffmpeg.exe
-     3) imageio_ffmpeg.get_ffmpeg_exe()
+    使用 infrastructure.media.ffmpeg_wrapper._find_and_set_ffmpeg
     """
-    # 1: env-provided
-    ffmpeg_path = os.environ.get("FFMPEG_PATH")
-    if not ffmpeg_path:
-        ffmpeg_path = os.environ.get("IMAGEIO_FFMPEG_EXE")
-    if ffmpeg_path:
-        # if user accidentally pointed to ffprobe, try sibling ffmpeg.exe
-        base = os.path.basename(ffmpeg_path).lower()
-        if "ffprobe" in base:
-            candidate = os.path.join(
-                os.path.dirname(ffmpeg_path), "ffmpeg.exe"
-            )
-            if os.path.isfile(candidate):
-                ffmpeg_path = candidate
-    # 2: repo-local
-    if not ffmpeg_path:
-        root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), os.pardir)
-        )
-        candidate = os.path.join(root, "FFmpeg", "ffmpeg.exe")
-        if os.path.isfile(candidate):
-            ffmpeg_path = candidate
-    # 3: imageio-ffmpeg
-    if not ffmpeg_path:
-        try:
-            import imageio_ffmpeg as _iioff  # type: ignore
-
-            exe = _iioff.get_ffmpeg_exe()
-            if exe:
-                ffmpeg_path = exe
-        except Exception:
-            pass
-
-    if ffmpeg_path and os.path.isfile(ffmpeg_path):
-        os.environ.setdefault("IMAGEIO_FFMPEG_EXE", ffmpeg_path)
-        try:
-            if _mpy_config is not None:
-                _mpy_config.change_settings({"FFMPEG_BINARY": ffmpeg_path})
-        except Exception:
-            pass
+    from spellvid.infrastructure.media.ffmpeg_wrapper import (
+        _find_and_set_ffmpeg as _impl
+    )
+    return _impl()
 
 
 def _measure_text_with_pil(text: str, pil_font: ImageFont.ImageFont):
@@ -697,9 +438,9 @@ def _make_text_imageclip(
     fixed_size: tuple | None = None,
 ):
     """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
-    
+
     已遷移至: spellvid.infrastructure.rendering.pillow_adapter._make_text_imageclip
-    
+
     Render text with Pillow and return a MoviePy ImageClip.
 
     prefer_cjk: if True, tries CJK fonts first.
@@ -1234,112 +975,54 @@ def _make_fixed_letter_clip(
     duration: float = None,
     prefer_cjk: bool = False,
 ):
-    """Render a single letter centered on a fixed transparent canvas and
-    return an ImageClip. This ensures per-letter clips have identical
-    dimensions to avoid pushing other clips when they appear/disappear."""
-    # delegate to _make_text_imageclip which now supports fixed_size
-    return _make_text_imageclip(
-        text=letter,
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 infrastructure.video.moviepy_adapter._make_fixed_letter_clip
+    """
+    from spellvid.infrastructure.video.moviepy_adapter import (
+        _make_fixed_letter_clip as _impl
+    )
+    return _impl(
+        letter=letter,
+        fixed_size=fixed_size,
         font_size=font_size,
         color=color,
         duration=duration,
         prefer_cjk=prefer_cjk,
-        extra_bottom=0,
-        fixed_size=fixed_size,
     )
 
 
 def check_assets(item: Dict[str, Any]) -> Dict[str, Any]:
-    res: Dict[str, Any] = {
-        "image_exists": False,
-        "music_exists": False,
-        "letters_mode": None,
-        "letters_assets": [],
-        "letters_missing": [],
-        "letters_missing_details": [],
-        "letters_asset_dir": None,
-        "letters_has_letters": False,
-    }
-    if os.path.isfile(item.get("image_path", "")):
-        res["image_exists"] = True
-    if os.path.isfile(item.get("music_path", "")):
-        res["music_exists"] = True
-    try:
-        letters_ctx = _prepare_letters_context(item)
-    except Exception:
-        letters_ctx = {
-            "mode": item.get("letters_as_image", True) and "image" or "text",
-            "filenames": [],
-            "missing_names": [],
-            "asset_dir": _resolve_letter_asset_dir(item),
-            "has_letters": bool(str(item.get("letters", "")).strip()),
-        }
-    res["letters_mode"] = letters_ctx.get("mode")
-    res["letters_assets"] = list(letters_ctx.get("filenames", []))
-    res["letters_missing"] = list(letters_ctx.get("missing_names", []))
-    res["letters_missing_details"] = list(letters_ctx.get("missing", []))
-    res["letters_asset_dir"] = letters_ctx.get("asset_dir")
-    res["letters_has_letters"] = bool(letters_ctx.get("has_letters"))
-    return res
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
+
+    使用 application.resource_checker.check_assets_dict
+    """
+    from spellvid.application.resource_checker import (
+        check_assets_dict as _impl
+    )
+    return _impl(item)
 
 
 def synthesize_beeps(duration_sec: int = 3, rate_hz: int = 1) -> bytes:
-    """Return a stub bytes object representing beep audio.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    This is intentionally simple to avoid binary deps.
+    使用 infrastructure.media.audio.synthesize_beeps
     """
-    return b"BEEP" * max(1, duration_sec * rate_hz)
+    from spellvid.infrastructure.media.audio import (
+        synthesize_beeps as _impl
+    )
+    return _impl(duration_sec, rate_hz)
 
 
 def _create_placeholder_mp4_with_ffmpeg(out_path: str) -> bool:
-    """Create a tiny valid mp4 using ffmpeg if available.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    Returns True on success, False otherwise.
+    使用 infrastructure.video.moviepy_adapter._create_placeholder_mp4_with_ffmpeg
     """
-    try:
-        ffmpeg = os.environ.get("IMAGEIO_FFMPEG_EXE") or shutil.which("ffmpeg")
-        if not ffmpeg:
-            return False
-    # create a single white frame PNG and encode to mp4
-    # (use +faststart to ensure moov atom is at file start)
-        with tempfile.TemporaryDirectory() as td:
-            png = os.path.join(td, "frame.png")
-            try:
-                from PIL import Image
-
-                img = Image.new("RGB", (1920, 1080), (255, 255, 255))
-                img.save(png, "PNG")
-            except Exception:
-                return False
-
-            cmd = [
-                ffmpeg,
-                "-y",
-                "-loop",
-                "1",
-                "-i",
-                png,
-                "-t",
-                "1",
-                "-vf",
-                "scale=1920:1080",
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-movflags",
-                "+faststart",
-                out_path,
-            ]
-            subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        return True
-    except Exception:
-        return False
+    from spellvid.infrastructure.video.moviepy_adapter import (
+        _create_placeholder_mp4_with_ffmpeg as _impl
+    )
+    return _impl(out_path)
 
 
 def render_video_stub(
@@ -1553,92 +1236,27 @@ def render_video_stub(
 
 
 def _apply_fadeout(clip, duration: float = None):
-    """Apply fade-out effect to video clip (both video and audio).
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    Args:
-        clip: MoviePy VideoClip object
-        duration: Fade-out duration in seconds. If None, uses FADE_OUT_DURATION.
-
-    Returns:
-        VideoClip with fade-out effect applied, or original clip if conditions not met.
+    使用 infrastructure.video.effects.apply_fadeout_effect
     """
-    if not _HAS_MOVIEPY or clip is None:
-        return clip
+    from spellvid.infrastructure.video.effects import (
+        apply_fadeout_effect as _impl,
+    )
 
-    if duration is None:
-        duration = FADE_OUT_DURATION
-
-    # Skip fade-out if video is too short
-    if clip.duration < duration:
-        return clip
-
-    # Apply video fade-out using MoviePy FX
-    try:
-        from moviepy.video.fx.FadeOut import FadeOut
-        effect = FadeOut(duration)
-        clip_with_fadeout = effect.apply(clip)
-    except Exception:
-        # Fallback if FadeOut not available
-        return clip
-
-    # Apply audio fade-out if audio exists
-    if clip_with_fadeout.audio is not None:
-        try:
-            from moviepy.audio.fx.AudioFadeOut import AudioFadeOut
-            audio_effect = AudioFadeOut(duration)
-            clip_with_fadeout = clip_with_fadeout.with_audio(
-                audio_effect.apply(clip_with_fadeout.audio)
-            )
-        except Exception:
-            # If audio fadeout fails, continue with video fadeout only
-            pass
-
-    return clip_with_fadeout
+    return _impl(clip, duration)
 
 
 def _apply_fadein(clip, duration: float = None, apply_audio: bool = False):
-    """Apply fade-in effect to video clip.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    Args:
-        clip: MoviePy VideoClip object
-        duration: Fade-in duration in seconds. If None, uses FADE_IN_DURATION.
-        apply_audio: If True, also apply fade-in to audio (Phase 3 feature).
-
-    Returns:
-        VideoClip with fade-in effect applied, or original clip if conditions not met.
+    使用 infrastructure.video.effects.apply_fadein_effect
     """
-    if not _HAS_MOVIEPY or clip is None:
-        return clip
+    from spellvid.infrastructure.video.effects import (
+        apply_fadein_effect as _impl,
+    )
 
-    if duration is None:
-        duration = FADE_IN_DURATION
-
-    # Skip fade-in if video is too short
-    if clip.duration < duration:
-        return clip
-
-    # Apply video fade-in using MoviePy FX
-    try:
-        from moviepy.video.fx.FadeIn import FadeIn
-        effect = FadeIn(duration)
-        clip_with_fadein = effect.apply(clip)
-    except Exception:
-        # Fallback if FadeIn not available
-        return clip
-
-    # Phase 3: Apply audio fade-in if requested
-    if apply_audio and clip_with_fadein.audio is not None:
-        try:
-            from moviepy.audio.fx.AudioFadeIn import AudioFadeIn
-            audio_effect = AudioFadeIn(duration)
-            clip_with_fadein = clip_with_fadein.with_audio(
-                audio_effect.apply(clip_with_fadein.audio)
-            )
-        except Exception:
-            # If audio fadein fails, continue with video fadein only
-            pass
-
-    return clip_with_fadein
+    return _impl(clip, duration, apply_audio)
 
 
 def concatenate_videos_with_transitions(
@@ -1647,175 +1265,46 @@ def concatenate_videos_with_transitions(
     fade_in_duration: float = None,
     apply_audio_fadein: bool = False,
 ) -> Dict[str, Any]:
-    """Concatenate multiple videos with transition effects.
+    """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
 
-    This function loads multiple video files, applies fade-in effects to all videos
-    except the first one (per D2 decision), and concatenates them into a single output.
-    Each input video is expected to already have fade-out applied (from render phase).
-
-    Args:
-        video_paths: List of video file paths to concatenate (in order)
-        output_path: Path for the final concatenated output video
-        fade_in_duration: Fade-in duration in seconds. If None, uses FADE_IN_DURATION.
-        apply_audio_fadein: If True, also apply fade-in to audio (Phase 3 feature).
-
-    Returns:
-        Dictionary with status information:
-        - status: "ok" | "error" | "skipped"
-        - message: Error message if status is "error"
-        - output: Output file path if successful
-        - clips_count: Number of clips concatenated
-        - total_duration: Total duration of concatenated video
-
-    Decision References:
-        - D1: All videos have fade-out (applied during render)
-        - D2: First video does not have fade-in; subsequent videos have 1s fade-in
-        - D4: Audio fade-in is controlled by apply_audio_fadein parameter
+    使用 application.batch_service.concatenate_videos_with_transitions
     """
-    if not _HAS_MOVIEPY:
-        return {
-            "status": "error",
-            "message": "MoviePy not available for video concatenation"
-        }
+    from spellvid.application.batch_service import (
+        concatenate_videos_with_transitions as _impl
+    )
+    return _impl(video_paths, output_path, fade_in_duration, apply_audio_fadein)
 
-    if not video_paths:
-        return {
-            "status": "error",
-            "message": "No video paths provided for concatenation"
-        }
 
-    if fade_in_duration is None:
-        fade_in_duration = FADE_IN_DURATION
-
-    clips = []
-    cleanup_clips = []
-
-    try:
-        # Load and process each video
-        for idx, path in enumerate(video_paths):
-            if not os.path.exists(path):
-                # Clean up already loaded clips
-                for clip in cleanup_clips:
-                    try:
-                        clip.close()
-                    except Exception:
-                        pass
-                return {
-                    "status": "error",
-                    "message": f"Video file not found: {path}"
-                }
-
-            try:
-                # Load video clip
-                clip = _mpy.VideoFileClip(path)
-                cleanup_clips.append(clip)
-
-                # D2 Decision: First video does not fade in
-                if idx == 0:
-                    # First video: use as-is (already has fade-out from render)
-                    clips.append(clip)
-                else:
-                    # Subsequent videos: apply fade-in
-                    clip_with_fadein = _apply_fadein(
-                        clip,
-                        duration=fade_in_duration,
-                        apply_audio=apply_audio_fadein
-                    )
-                    clips.append(clip_with_fadein)
-
-            except Exception as e:
-                # Clean up on error
-                for clip in cleanup_clips:
-                    try:
-                        clip.close()
-                    except Exception:
-                        pass
-                return {
-                    "status": "error",
-                    "message": f"Failed to load video {path}: {str(e)}"
-                }
-
-        # Concatenate all clips
-        try:
-            final_clip = _mpy.concatenate_videoclips(clips, method="compose")
-        except Exception:
-            # Fallback to default method if 'compose' fails
-            try:
-                final_clip = _mpy.concatenate_videoclips(clips)
-            except Exception as e:
-                # Clean up
-                for clip in cleanup_clips:
-                    try:
-                        clip.close()
-                    except Exception:
-                        pass
-                return {
-                    "status": "error",
-                    "message": f"Failed to concatenate videos: {str(e)}"
-                }
-
-        total_duration = float(getattr(final_clip, "duration", 0) or 0)
-
-        # Write output video
-        try:
-            # Create output directory if needed
-            output_dir = os.path.dirname(output_path)
-            if output_dir and not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-
-            # Use ffmpeg settings similar to render_video_moviepy
-            ffmpeg_exe = os.environ.get("IMAGEIO_FFMPEG_EXE")
-            if ffmpeg_exe:
-                final_clip.write_videofile(
-                    output_path,
-                    fps=30,
-                    codec="libx264",
-                    audio_codec="aac",
-                    threads=4,
-                    preset="medium",
-                )
-            else:
-                # Fallback: simple call
-                final_clip.write_videofile(output_path, fps=30)
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Failed to write output video: {str(e)}"
-            }
-
-        finally:
-            # Clean up all clips
-            try:
-                final_clip.close()
-            except Exception:
-                pass
-
-            for clip in cleanup_clips:
-                try:
-                    clip.close()
-                except Exception:
-                    pass
-
-        return {
-            "status": "ok",
-            "output": output_path,
-            "clips_count": len(clips),
-            "total_duration": total_duration,
-        }
-
-    except Exception as e:
-        # Catch-all error handler
-        for clip in cleanup_clips:
-            try:
-                clip.close()
-            except Exception:
-                pass
-
-        return {
-            "status": "error",
-            "message": f"Unexpected error during concatenation: {str(e)}"
-        }
+# ========== 核心渲染函數 (暫時保留) ==========
+#
+# 以下兩個函數是核心業務邏輯,合計約 1,860 行:
+# - render_video_stub: ~230 lines (元數據計算和占位視頻)
+# - render_video_moviepy: ~1,630 lines (完整 MoviePy 渲染管線)
+#
+# 保留原因:
+# 1. 被 >30 個測試覆蓋,功能穩定
+# 2. 已在正確的應用層位置
+# 3. 完整重構需要 20-30 小時且風險極高
+#
+# v2.0 重構計劃:
+# 1. 拆分 render_video_moviepy 為 10-15 個子函數:
+#    - _prepare_context() - 準備所有上下文
+#    - _create_background() - 背景處理
+#    - _render_letters() - 字母渲染
+#    - _render_chinese_zhuyin() - 中文注音渲染
+#    - _render_timer() - 計時器渲染
+#    - _render_reveal() - Reveal 打字效果
+#    - _render_progress_bar() - 進度條渲染
+#    - _process_audio() - 音訊處理
+#    - _load_entry_ending() - 載入片頭片尾
+#    - _compose_and_export() - 組合並輸出
+# 2. 遷移至 application/video_service.py
+# 3. 使用 Protocol 定義可測試介面
+#
+# 參考:
+# - application/video_service.py: 未來架構框架
+# - specs/004-complete-module-migration/: 遷移文檔
+# ==========================================================
 
 
 def render_video_moviepy(
@@ -3036,26 +2525,11 @@ def render_video_moviepy(
             # keep going — renderer can still produce video without music
             pass
 
+    # Import beep audio generation function from infrastructure layer
+    from spellvid.infrastructure.media.audio import make_beep
+
     # beep: generate short sine beeps aligned to the countdown display
     # using the precomputed schedule from timer visibility planning.
-    def make_beep(start_sec):
-        freq = 1000.0
-        length = 0.3
-
-        def make_frame(t):
-            # t may be array-like; compute sine and return mono samples
-            mono = (_np.sin(2 * _np.pi * freq * t) * 0.2).astype(_np.float32)
-            # ensure a 2-channel (stereo) array to match common audio
-            # track shapes and avoid broadcasting errors during mix
-            try:
-                stereo = _np.column_stack((mono, mono))
-            except Exception:
-                stereo = mono.reshape(-1, 1)
-            return stereo
-
-        ac = _mpy.AudioClip(make_frame, duration=length, fps=44100)
-        return ac.with_start(start_sec)
-
     for start in beep_schedule:
         try:
             audio_clips.append(make_beep(start))
@@ -3074,87 +2548,18 @@ def render_video_moviepy(
     # Note: ending.mp4 will not have additional fade-out (D8 decision)
     main_clip = _apply_fadeout(main_clip, duration=FADE_OUT_DURATION)
 
+    # Import clip dimension/letterbox utilities from infrastructure layer
+    from spellvid.infrastructure.video.moviepy_adapter import (
+        _ensure_dimensions,
+        _ensure_fullscreen_cover,
+        _auto_letterbox_crop,
+    )
+
     entry_loaded = False
     entry_error = None
     entry_clip_obj = None
     hold_clip = None
     cleanup_clips: List[Any] = []
-
-    def _ensure_dimensions(clip):
-        try:
-            size = getattr(clip, "size", None)
-            if size:
-                w, h = int(size[0]), int(size[1])
-                if (w, h) != (1920, 1080):
-                    try:
-                        clip = clip.resized(new_size=(1920, 1080))
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-        return clip
-
-    def _ensure_fullscreen_cover(clip):
-        try:
-            size = getattr(clip, "size", None)
-            if not size:
-                return clip
-            w, h = float(size[0]), float(size[1])
-            if w <= 0 or h <= 0:
-                return clip
-            target_w, target_h = 1920.0, 1080.0
-            # 總是執行非等比例縮放，確保完整畫面無裁剪
-            try:
-                clip = clip.resized(new_size=(int(target_w), int(target_h)))
-            except Exception:
-                return clip
-        except Exception:
-            pass
-        return clip
-
-    def _auto_letterbox_crop(clip):
-        try:
-            sample_points = [0.0]
-            try:
-                dur = float(getattr(clip, "duration", 0.0) or 0.0)
-            except Exception:
-                dur = 0.0
-            if dur > 0.5:
-                sample_points.append(max(0.0, dur / 2.0))
-            frame = None
-            for t in sample_points:
-                try:
-                    frame = clip.get_frame(t)
-                    if frame is not None:
-                        break
-                except Exception:
-                    frame = None
-            if frame is None:
-                return clip
-            arr = _np.asarray(frame)
-            if arr.ndim == 3:
-                gray = arr.mean(axis=2)
-            else:
-                gray = arr.astype(float)
-            valid = gray > 15.0
-            if not valid.any():
-                return clip
-            rows = _np.where(valid.any(axis=1))[0]
-            cols = _np.where(valid.any(axis=0))[0]
-            if rows.size == 0 or cols.size == 0:
-                return clip
-            top, bottom = int(rows[0]), int(rows[-1])
-            left, right = int(cols[0]), int(cols[-1])
-            if top <= 2 and left <= 2 and bottom >= arr.shape[0] - 3 and right >= arr.shape[1] - 3:
-                return clip
-            pad = 2
-            top = max(0, top - pad)
-            left = max(0, left - pad)
-            bottom = min(arr.shape[0] - 1, bottom + pad)
-            right = min(arr.shape[1] - 1, right + pad)
-            return clip.cropped(x1=float(left), y1=float(top), x2=float(right + 1), y2=float(bottom + 1))
-        except Exception:
-            return clip
 
     if entry_ctx.get("exists"):
         try:
