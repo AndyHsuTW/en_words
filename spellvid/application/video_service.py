@@ -64,24 +64,24 @@ class VideoRenderingContext:
 
 def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
     """Prepare all rendering context data upfront.
-    
+
     Gathers all necessary data for video rendering:
     - Layout computation (bboxes for all elements)
     - Timeline calculation (timing for countdown, reveal, etc.)
     - Entry/ending video contexts
     - Letters resource contexts
     - Metadata (video size, fps, etc.)
-    
+
     Args:
         item: JSON configuration dict (must pass schema validation)
-    
+
     Returns:
         VideoRenderingContext with all computed data
-    
+
     Raises:
         ValueError: If item fails validation
         FileNotFoundError: If required assets missing (unless dry_run)
-    
+
     Example:
         >>> item = {"letters": "C c", "word_en": "Cat", "word_zh": "貓", ...}
         >>> ctx = _prepare_all_context(item)
@@ -93,13 +93,13 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
         prepare_ending_context,
         prepare_letters_context,
     )
-    
+
     # Set defaults for optional fields
     if "countdown_sec" not in item:
         item["countdown_sec"] = 10
     if "reveal_hold_sec" not in item:
         item["reveal_hold_sec"] = 5
-    
+
     # Validate required fields
     required_fields = [
         "letters", "word_en", "word_zh", "image_path", "music_path"
@@ -109,7 +109,7 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
         raise ValueError(
             f"Missing required fields: {', '.join(missing)}"
         )
-    
+
     # Convert item dict to VideoConfig for layout computation
     from spellvid.shared.types import VideoConfig as VC
     config = VC(
@@ -121,11 +121,11 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
         countdown_sec=int(item.get("countdown_sec", 10)),
         reveal_hold_sec=int(item.get("reveal_hold_sec", 5)),
     )
-    
+
     # Compute layout
     layout_result = compute_layout_bboxes(config)
     layout = layout_result.to_dict()
-    
+
     # Compute timeline
     per_letter_time = 1.0
     word_en = item.get("word_en", "")
@@ -133,7 +133,7 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
     countdown = int(item.get("countdown_sec", 10))
     reveal_hold = int(item.get("reveal_hold_sec", 5))
     main_duration = countdown + reveal_time + reveal_hold
-    
+
     timeline = {
         "countdown_start": 0.0,
         "countdown_end": float(countdown),
@@ -143,16 +143,16 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
         "hold_end": main_duration,
         "total_duration": main_duration,
     }
-    
+
     # Prepare entry context
     entry_ctx = prepare_entry_context(item)
-    
+
     # Prepare ending context
     ending_ctx = prepare_ending_context(item)
-    
+
     # Prepare letters context
     letters_ctx = prepare_letters_context(item)
-    
+
     # Prepare metadata
     metadata = {
         "video_size": (1920, 1080),  # CANVAS_WIDTH, CANVAS_HEIGHT
@@ -160,7 +160,7 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
         "bg_color": (255, 250, 233),  # COLOR_WHITE
         "main_duration": main_duration,
     }
-    
+
     return VideoRenderingContext(
         item=item,
         layout=layout,
@@ -170,6 +170,116 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
         letters_ctx=letters_ctx,
         metadata=metadata,
     )
+
+
+def _create_background_clip(ctx: VideoRenderingContext) -> Any:
+    """Create background clip (image or solid color).
+    
+    Creates either:
+    - Image/video background (if image_path present)
+    - Solid color background (if no image)
+    
+    Args:
+        ctx: VideoRenderingContext with item and metadata
+    
+    Returns:
+        MoviePy Clip (ImageClip, VideoFileClip, or ColorClip)
+    
+    Raises:
+        FileNotFoundError: If image_path specified but not found
+        RuntimeError: If clip creation fails
+    
+    Example:
+        >>> ctx = _prepare_all_context(item)
+        >>> bg_clip = _create_background_clip(ctx)
+        >>> assert bg_clip.duration == ctx.timeline["total_duration"]
+    """
+    # Import MoviePy (try editor first, fall back to top-level)
+    mpy = None
+    try:
+        from moviepy import editor as mpy  # type: ignore
+    except (ImportError, AttributeError):
+        try:
+            import moviepy as mpy  # type: ignore
+        except ImportError:
+            raise RuntimeError("MoviePy not available")
+    
+    duration = ctx.timeline["total_duration"]
+    video_size = ctx.metadata["video_size"]
+    bg_color = ctx.metadata["bg_color"]
+    
+    # Always create base color clip
+    bg_clip = mpy.ColorClip(
+        size=video_size,
+        color=bg_color,
+        duration=duration
+    )
+    
+    # If image/video provided, load and overlay
+    img_path = ctx.item.get("image_path", "")
+    if img_path and os.path.exists(img_path):
+        img_exts = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff")
+        vid_exts = (".mp4", ".mov", ".mkv", ".avi", ".webm")
+        
+        if img_path.lower().endswith(img_exts):
+            # Static image - load with Pillow and create ImageClip
+            from PIL import Image as PILImage
+            import numpy as np
+            
+            pil_img = PILImage.open(img_path).convert("RGBA")
+            # Scale to fit centered region (70% of canvas)
+            square_size = int(min(video_size) * 0.7)
+            w0, h0 = pil_img.size
+            scale = min(square_size / w0, square_size / h0)
+            new_w = max(1, int(w0 * scale))
+            new_h = max(1, int(h0 * scale))
+            pil_img = pil_img.resize((new_w, new_h), PILImage.LANCZOS)
+            
+            arr = np.array(pil_img)
+            img_clip = mpy.ImageClip(arr, duration=duration)
+            
+            # Center the image
+            img_clip = img_clip.with_position(("center", "center"))
+            
+            # Composite: background + centered image
+            bg_clip = mpy.CompositeVideoClip([bg_clip, img_clip])
+            
+        elif img_path.lower().endswith(vid_exts):
+            # Video file - load as VideoFileClip
+            vid_clip = mpy.VideoFileClip(img_path)
+            
+            # Get video mode (cover/contain)
+            video_mode = ctx.item.get("video_mode", "cover")
+            
+            if video_mode == "cover":
+                # Scale to cover entire canvas
+                vid_w, vid_h = vid_clip.size
+                canvas_w, canvas_h = video_size
+                scale_w = canvas_w / vid_w
+                scale_h = canvas_h / vid_h
+                scale = max(scale_w, scale_h)
+                vid_clip = vid_clip.resized(scale)
+                vid_clip = vid_clip.with_position(("center", "center"))
+            else:
+                # Contain mode - fit within canvas
+                vid_w, vid_h = vid_clip.size
+                canvas_w, canvas_h = video_size
+                scale_w = canvas_w / vid_w
+                scale_h = canvas_h / vid_h
+                scale = min(scale_w, scale_h)
+                vid_clip = vid_clip.resized(scale)
+                vid_clip = vid_clip.with_position(("center", "center"))
+            
+            # Loop video if shorter than duration
+            if vid_clip.duration < duration:
+                vid_clip = vid_clip.loop(duration=duration)
+            else:
+                vid_clip = vid_clip.subclipped(0, duration)
+            
+            # Composite: background + video
+            bg_clip = mpy.CompositeVideoClip([bg_clip, vid_clip])
+    
+    return bg_clip
 
 
 # ============================================================================
