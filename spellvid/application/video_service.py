@@ -567,11 +567,12 @@ def _compose_and_export(
 
 
 def render_video(
-    item: Dict[str, Any],
-    output_path: str,
+    item: Dict[str, Any] | None = None,
+    output_path: str = "",
     dry_run: bool = False,
     skip_ending: bool = False,
     composer: Optional[IVideoComposer] = None,
+    config: Optional[VideoConfig] = None,  # Backward compatibility
 ) -> Dict[str, Any]:
     """Orchestrate complete video rendering pipeline.
 
@@ -584,6 +585,7 @@ def render_video(
         dry_run: If True, only compute metadata without rendering
         skip_ending: If True, omit ending video (for batch processing)
         composer: IVideoComposer implementation (None = default MoviePy)
+        config: VideoConfig object (DEPRECATED, use item dict instead)
 
     Returns:
         Rendering result dict:
@@ -609,6 +611,23 @@ def render_video(
         >>> result["success"]
         True
     """
+    # Backward compatibility: convert VideoConfig to dict
+    if config is not None and item is None:
+        item = {
+            "letters": config.letters,
+            "word_en": config.word_en,
+            "word_zh": config.word_zh,
+            "image_path": config.image_path,
+            "music_path": config.music_path,
+            "countdown_sec": config.countdown_sec,
+            "reveal_hold_sec": config.reveal_hold_sec,
+        }
+    
+    if item is None:
+        raise ValueError(
+            "Either 'item' dict or 'config' VideoConfig must be provided"
+        )
+    
     # Step 1: Prepare all context data upfront
     # (layout, timeline, entry/ending/letters contexts, metadata)
     ctx = _prepare_all_context(item)
