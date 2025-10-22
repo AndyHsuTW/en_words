@@ -12,6 +12,7 @@ from typing import Dict, Any
 from spellvid.application.video_service import (
     VideoRenderingContext,
     _prepare_all_context,
+    _create_background_clip,
 )
 
 
@@ -21,7 +22,7 @@ from spellvid.application.video_service import (
 
 def test_prepare_all_context_with_valid_item():
     """Test context preparation with valid JSON item.
-    
+
     EXPECTED: FAIL (function not yet implemented)
     """
     # Arrange - valid JSON config
@@ -34,32 +35,32 @@ def test_prepare_all_context_with_valid_item():
         "image_path": "assets/cat.mp4",
         "music_path": "assets/cat_60s.mp3"
     }
-    
+
     # Act
     ctx = _prepare_all_context(item)
-    
+
     # Assert - context structure
     assert isinstance(ctx, VideoRenderingContext)
     assert ctx.item == item
-    
+
     # Verify layout computed (actual keys from LayoutResult.to_dict())
     assert "letters" in ctx.layout
     assert "word_zh" in ctx.layout
     assert "timer" in ctx.layout
     assert "reveal" in ctx.layout
-    
+
     # Verify timeline computed
     assert "countdown_start" in ctx.timeline
     assert "reveal_start" in ctx.timeline
     assert "total_duration" in ctx.timeline
     assert ctx.timeline["countdown_start"] == 0.0
     assert ctx.timeline["reveal_start"] >= 3.0  # After countdown
-    
+
     # Verify contexts prepared
     assert "enabled" in ctx.entry_ctx
     assert "enabled" in ctx.ending_ctx
     assert "letters" in ctx.letters_ctx
-    
+
     # Verify metadata
     assert "video_size" in ctx.metadata
     assert ctx.metadata["video_size"] == (1920, 1080)
@@ -67,7 +68,7 @@ def test_prepare_all_context_with_valid_item():
 
 def test_prepare_all_context_validates_schema():
     """Test context preparation rejects invalid item.
-    
+
     EXPECTED: FAIL (function not yet implemented)
     """
     # Arrange - missing required fields
@@ -75,7 +76,7 @@ def test_prepare_all_context_validates_schema():
         "letters": "I i",
         # Missing word_en, word_zh, image_path, music_path
     }
-    
+
     # Act & Assert
     with pytest.raises(ValueError, match="validation|required"):
         _prepare_all_context(item)
@@ -83,7 +84,7 @@ def test_prepare_all_context_validates_schema():
 
 def test_prepare_all_context_handles_missing_optional_fields():
     """Test context preparation with missing optional fields.
-    
+
     EXPECTED: FAIL (function not yet implemented)
     """
     # Arrange - minimal valid config
@@ -95,10 +96,10 @@ def test_prepare_all_context_handles_missing_optional_fields():
         "music_path": "assets/animal_20s.mp3",
         # countdown_sec, reveal_hold_sec will use defaults
     }
-    
+
     # Act
     ctx = _prepare_all_context(item)
-    
+
     # Assert - uses defaults
     assert isinstance(ctx, VideoRenderingContext)
     assert ctx.item["countdown_sec"] == 10  # Default
@@ -107,7 +108,7 @@ def test_prepare_all_context_handles_missing_optional_fields():
 
 def test_prepare_all_context_computes_letters_context():
     """Test that letters context includes paths and missing info.
-    
+
     EXPECTED: FAIL (function not yet implemented)
     """
     # Arrange
@@ -118,14 +119,14 @@ def test_prepare_all_context_computes_letters_context():
         "image_path": "assets/cat.mp4",
         "music_path": "assets/cat_60s.mp3"
     }
-    
+
     # Act
     ctx = _prepare_all_context(item)
-    
+
     # Assert - letters context structure (actual structure from context_builder)
     assert "letters" in ctx.letters_ctx
     assert ctx.letters_ctx["letters"] == "A b C"  # Original string
-    
+
     # Check layout details (nested)
     if "layout" in ctx.letters_ctx:
         layout_detail = ctx.letters_ctx["layout"]
@@ -137,10 +138,69 @@ def test_prepare_all_context_computes_letters_context():
                 first_letter = letters_list[0]
                 assert "char" in first_letter
                 assert "filename" in first_letter
-    
+
     # Missing letters tracking
     assert "missing" in ctx.letters_ctx
     assert isinstance(ctx.letters_ctx["missing"], list)
+
+
+# ============================================================================
+# T006: _create_background_clip() tests
+# ============================================================================
+
+def test_create_background_clip_with_image():
+    """Test background clip creation with image background.
+    
+    EXPECTED: FAIL (function not yet implemented)
+    """
+    # Arrange
+    item = {
+        "letters": "C c",
+        "word_en": "Cat",
+        "word_zh": "貓",
+        "image_path": "assets/cat.mp4",
+        "music_path": "assets/cat_60s.mp3",
+        "countdown_sec": 3,
+        "reveal_hold_sec": 2,
+    }
+    ctx = _prepare_all_context(item)
+    
+    # Act
+    bg_clip = _create_background_clip(ctx)
+    
+    # Assert
+    assert bg_clip is not None
+    # Check duration matches expected
+    assert hasattr(bg_clip, 'duration')
+    # Background should use image if present
+    # (actual assertion depends on MoviePy clip type)
+
+
+def test_create_background_clip_with_solid_color():
+    """Test background clip creation with solid color (no image).
+    
+    EXPECTED: FAIL (function not yet implemented)
+    """
+    # Arrange - no image_path
+    item = {
+        "letters": "A a",
+        "word_en": "Apple",
+        "word_zh": "蘋果",
+        "image_path": "",  # Empty image path
+        "music_path": "assets/animal_20s.mp3",
+        "countdown_sec": 3,
+        "reveal_hold_sec": 2,
+    }
+    ctx = _prepare_all_context(item)
+    
+    # Act
+    bg_clip = _create_background_clip(ctx)
+    
+    # Assert
+    assert bg_clip is not None
+    assert hasattr(bg_clip, 'duration')
+    # Should create solid color background
+    # Duration should match context timeline
 
 
 # ============================================================================
