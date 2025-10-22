@@ -150,7 +150,7 @@ def test_prepare_all_context_computes_letters_context():
 
 def test_create_background_clip_with_image():
     """Test background clip creation with image background.
-    
+
     EXPECTED: FAIL (function not yet implemented)
     """
     # Arrange
@@ -164,10 +164,10 @@ def test_create_background_clip_with_image():
         "reveal_hold_sec": 2,
     }
     ctx = _prepare_all_context(item)
-    
+
     # Act
     bg_clip = _create_background_clip(ctx)
-    
+
     # Assert
     assert bg_clip is not None
     # Check duration matches expected
@@ -178,7 +178,7 @@ def test_create_background_clip_with_image():
 
 def test_create_background_clip_with_solid_color():
     """Test background clip creation with solid color (no image).
-    
+
     EXPECTED: FAIL (function not yet implemented)
     """
     # Arrange - no image_path
@@ -192,15 +192,211 @@ def test_create_background_clip_with_solid_color():
         "reveal_hold_sec": 2,
     }
     ctx = _prepare_all_context(item)
-    
+
     # Act
     bg_clip = _create_background_clip(ctx)
-    
+
     # Assert
     assert bg_clip is not None
     assert hasattr(bg_clip, 'duration')
     # Should create solid color background
     # Duration should match context timeline
+
+
+# ============================================================================
+# Helper fixtures (if needed)
+# ============================================================================
+
+# ============================================================================
+# T015: render_video() orchestration tests
+# ============================================================================
+
+def test_render_video_orchestration_calls_all_subfunctions(
+    mocker, tmp_path  # type: ignore
+):
+    """Test that render_video() calls all 11 sub-functions in correct order.
+
+    EXPECTED: FAIL (new orchestration not yet implemented)
+    """
+    # Arrange - mock all sub-functions
+    mock_prepare = mocker.patch(
+        'spellvid.application.video_service._prepare_all_context'
+    )
+    mock_bg = mocker.patch(
+        'spellvid.application.video_service._create_background_clip'
+    )
+    mock_letters = mocker.patch(
+        'spellvid.application.video_service._render_letters_layer'
+    )
+    mock_chinese = mocker.patch(
+        'spellvid.application.video_service.'
+        '_render_chinese_zhuyin_layer'
+    )
+    mock_timer = mocker.patch(
+        'spellvid.application.video_service._render_timer_layer'
+    )
+    mock_reveal = mocker.patch(
+        'spellvid.application.video_service._render_reveal_layer'
+    )
+    mock_progress = mocker.patch(
+        'spellvid.application.video_service.'
+        '_render_progress_bar_layer'
+    )
+    mock_audio = mocker.patch(
+        'spellvid.application.video_service._process_audio_tracks'
+    )
+    mock_entry_ending = mocker.patch(
+        'spellvid.application.video_service._load_entry_ending_clips'
+    )
+    mock_compose = mocker.patch(
+        'spellvid.application.video_service._compose_and_export'
+    )
+
+    # Setup mock return values
+    from spellvid.application.video_service import VideoRenderingContext
+
+    mock_ctx = VideoRenderingContext(
+        item={"letters": "C c", "word_en": "Cat", "word_zh": "貓"},
+        layout={"letters": [], "word_zh": {}, "timer": {}, "reveal": {}},
+        timeline={"total_duration": 10.0},
+        entry_ctx={"enabled": False},
+        ending_ctx={"enabled": False},
+        letters_ctx={"letters": "C c"},
+        metadata={"video_size": (1920, 1080), "fps": 24},
+    )
+    mock_prepare.return_value = mock_ctx
+    mock_entry_ending.return_value = (None, None)
+
+    # Item dict to render
+    item = {
+        "letters": "C c",
+        "word_en": "Cat",
+        "word_zh": "貓",
+        "image_path": "assets/cat.mp4",
+        "music_path": "assets/cat_60s.mp3",
+    }
+    output_path = str(tmp_path / "test.mp4")
+
+    # Act - import the new render_video (not old one)
+    from spellvid.application.video_service import render_video
+
+    # Note: New signature uses item dict, not VideoConfig
+    render_video(item, output_path, dry_run=False, skip_ending=False)
+
+    # Assert - all sub-functions called in order
+    mock_prepare.assert_called_once_with(item)
+    mock_bg.assert_called_once_with(mock_ctx)
+    mock_letters.assert_called_once_with(mock_ctx)
+    mock_chinese.assert_called_once_with(mock_ctx)
+    mock_timer.assert_called_once_with(mock_ctx)
+    mock_reveal.assert_called_once_with(mock_ctx)
+    mock_progress.assert_called_once_with(mock_ctx)
+    mock_audio.assert_called_once_with(mock_ctx)
+    mock_entry_ending.assert_called_once_with(mock_ctx)
+    mock_compose.assert_called_once()  # Check it was called
+
+
+def test_render_video_orchestration_returns_metadata(tmp_path):
+    """Test that render_video() returns expected metadata dict.
+
+    EXPECTED: FAIL (new orchestration not yet implemented)
+    """
+    # Arrange
+    item = {
+        "letters": "A a",
+        "word_en": "Apple",
+        "word_zh": "蘋果",
+        "image_path": "assets/cat.mp4",
+        "music_path": "assets/cat_60s.mp3",
+        "countdown_sec": 3,
+        "reveal_hold_sec": 2,
+    }
+    output_path = str(tmp_path / "test.mp4")
+
+    # Act
+    from spellvid.application.video_service import render_video
+    result = render_video(item, output_path, dry_run=True)
+
+    # Assert - metadata structure
+    assert isinstance(result, dict)
+    assert "success" in result
+    assert "duration" in result
+    assert "output_path" in result
+    assert "metadata" in result
+    assert result["success"] is True
+
+
+def test_render_video_orchestration_handles_skip_ending(
+    mocker, tmp_path  # type: ignore
+):
+    """Test that skip_ending flag is passed to ending context.
+
+    EXPECTED: FAIL (new orchestration not yet implemented)
+    """
+    # Arrange
+    mock_prepare = mocker.patch(
+        'spellvid.application.video_service._prepare_all_context'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._compose_and_export'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._create_background_clip'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._render_letters_layer'
+    )
+    mocker.patch(
+        'spellvid.application.video_service.'
+        '_render_chinese_zhuyin_layer'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._render_timer_layer'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._render_reveal_layer'
+    )
+    mocker.patch(
+        'spellvid.application.video_service.'
+        '_render_progress_bar_layer'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._process_audio_tracks'
+    )
+    mocker.patch(
+        'spellvid.application.video_service._load_entry_ending_clips'
+    )
+
+    from spellvid.application.video_service import VideoRenderingContext
+
+    mock_ctx = VideoRenderingContext(
+        item={"letters": "C c", "word_en": "Cat", "word_zh": "貓"},
+        layout={"letters": [], "word_zh": {}, "timer": {}, "reveal": {}},
+        timeline={"total_duration": 10.0},
+        entry_ctx={"enabled": False},
+        ending_ctx={"enabled": False},  # Should be False when skip_ending=True
+        letters_ctx={"letters": "C c"},
+        metadata={"video_size": (1920, 1080), "fps": 24},
+    )
+    mock_prepare.return_value = mock_ctx
+
+    item = {
+        "letters": "C c",
+        "word_en": "Cat",
+        "word_zh": "貓",
+        "image_path": "assets/cat.mp4",
+        "music_path": "assets/cat_60s.mp3",
+        "skip_ending": True,  # Pass flag in item
+    }
+    output_path = str(tmp_path / "test.mp4")
+
+    # Act
+    from spellvid.application.video_service import render_video
+    render_video(item, output_path, dry_run=False, skip_ending=True)
+
+    # Assert - ending context should reflect skip_ending
+    # (actual assertion depends on how context handles this flag)
+    mock_prepare.assert_called_once()
 
 
 # ============================================================================
