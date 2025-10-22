@@ -396,48 +396,27 @@ Phase 9: Documentation (T023-T025)
 
 ## Phase 6: Backward Compatibility
 
-- [ ] **T016** Create deprecated wrapper for render_video_moviepy
+- [x] **T016** Create deprecated wrapper for render_video_moviepy ✅
   - **File**: `spellvid/utils.py`
   - **Actions**:
-    - Remove old render_video_moviepy implementation (~1,630 lines)
-    - Add lightweight wrapper (~10-15 lines):
-      ```python
-      def render_video_moviepy(item, out_path, dry_run=False, skip_ending=False):
-          """⚠️ DEPRECATED: 向後相容層 - 將在 v2.0 移除
-          
-          使用 application.video_service.render_video 代替
-          """
-          warnings.warn(
-              "render_video_moviepy is deprecated. "
-              "Use application.video_service.render_video instead.",
-              DeprecationWarning,
-              stacklevel=2
-          )
-          from spellvid.application.video_service import render_video
-          return render_video(item, out_path, dry_run, skip_ending)
-      ```
-    - Add imports: `import warnings`
-  - **Expected**: Wrapper delegates to new API, triggers DeprecationWarning
+    - Remove old render_video_moviepy implementation (~1,631 lines) ✅
+    - Add lightweight wrapper (~45 lines) ✅
+    - Add imports: `import warnings` ✅
+  - **Expected**: Wrapper delegates to new API, triggers DeprecationWarning ✅
   - **Rollback**: `git reset --hard HEAD~1`
-  - **Commit**: `refactor: replace render_video_moviepy with deprecated wrapper`
+  - **Commit**: a7ba1e9 `refactor: replace render_video_moviepy with deprecated wrapper (T016)`
+  - **Result**: ✅ utils.py: 2,979 → 1,348 lines (54.8% reduction), contract tests 18/23 PASSED
 
-- [ ] **T017** Create deprecated wrapper for render_video_stub
+- [x] **T017** Create deprecated wrapper for render_video_stub ✅
   - **File**: `spellvid/utils.py`
   - **Actions**:
-    - Keep render_video_stub implementation (metadata computation, ~283 lines)
-    - Add DeprecationWarning at top of function:
-      ```python
-      warnings.warn(
-          "render_video_stub is deprecated. "
-          "Use application.video_service.render_video with dry_run=True.",
-          DeprecationWarning,
-          stacklevel=2
-      )
-      ```
+    - Keep render_video_stub implementation (metadata computation, ~283 lines) ✅
+    - Add DeprecationWarning at top of function ✅
     - NOTE: render_video_stub will be fully refactored in future phase
-  - **Expected**: Wrapper triggers DeprecationWarning, functionality unchanged
+  - **Expected**: Wrapper triggers DeprecationWarning, functionality unchanged ✅
   - **Rollback**: `git reset --hard HEAD~1`
-  - **Commit**: `refactor: add deprecation warning to render_video_stub`
+  - **Commit**: 7344403 `refactor: add deprecation warning to render_video_stub (T017)`
+  - **Result**: ✅ DeprecationWarning added, function preserved
 
 ---
 
