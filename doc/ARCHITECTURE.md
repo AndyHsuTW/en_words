@@ -169,30 +169,126 @@ def make_command(args):
 - 呼叫 Domain 純函數計算結果
 - 使用 Infrastructure 適配器執行副作用 (檔案 I/O, 視頻編碼)
 
-**範例**:
+#### 視頻渲染服務 (Phase 3.10 重構)
+
+**video_service.py 架構** (2025-01-18 重構完成):
+
+```
+render_video() - 80-line orchestrator
+    ↓
+  1. _prepare_all_context()        → VideoRenderingContext
+  2. _create_background_clip()     → ImageClip (1920x1080)
+  3. _render_letters_layer()       → CompositeVideoClip [STUB]
+  4. _render_chinese_zhuyin_layer()→ ImageClip [STUB]
+  5. _render_timer_layer()         → ImageClip [STUB]
+  6. _render_reveal_layer()        → CompositeVideoClip [STUB]
+  7. _render_progress_bar_layer()  → CompositeVideoClip [STUB]
+  8. _process_audio_tracks()       → AudioClip [STUB]
+  9. _load_entry_ending_clips()    → (VideoClip, VideoClip) [STUB]
+  10. [Filter 1x1 stub clips]      → layers: List[VideoClip]
+  11. _compose_and_export()        → Writes MP4 to disk [STUB]
+    ↓
+Output: {"success": True, "duration": 10.5, "output_path": "...", ...}
+```
+
+**設計特點**:
+- ✅ **單一職責**: 每個子函數處理單一渲染層
+- ✅ **可測試**: 使用 Protocol-based design (IVideoComposer)
+- ✅ **組合性**: 子函數可獨立測試和替換
+- ✅ **效能**: 存根函數 (1x1 clips) 在主函數中被過濾,不影響輸出
+
+**範例** (完整架構):
 ```python
 # spellvid/application/video_service.py
 from spellvid.domain.layout import compute_layout_bboxes
 from spellvid.infrastructure.video.moviepy_adapter import MoviePyAdapter
+from spellvid.shared.types import VideoRenderingContext
 
-def render_video(config: VideoConfig, dry_run: bool = False):
-    """生成單支教學視頻"""
-    # 1. 計算佈局 (Domain 純函數)
-    layout = compute_layout_bboxes(config)
+def render_video(
+    item: Dict[str, Any] | None = None,
+    output_path: str = "",
+    dry_run: bool = False,
+    skip_ending: bool = False,
+    composer: Optional[IVideoComposer] = None,
+    config: Optional[VideoConfig] = None,  # Backward compatibility
+) -> Dict[str, Any]:
+    """Orchestrate complete video rendering pipeline.
     
-    # 2. 檢查資源 (Application 邏輯)
-    check_assets(config)
+    Phase 3.10: Refactored from monolithic render_video_moviepy (~1,630 lines)
+    into 11 composable sub-functions (~80 lines orchestrator).
     
-    if dry_run:
-        return {"status": "dry-run", "layout": layout}
+    Args:
+        item: Video configuration dict (new API)
+        config: VideoConfig object (backward compatibility)
+        output_path: MP4 output path
+        dry_run: Skip actual rendering
+        skip_ending: Skip ending video clip
+        composer: Optional IVideoComposer implementation
     
-    # 3. 渲染視頻 (Infrastructure 適配器)
-    composer = MoviePyAdapter()
-    video_clip = composer.create_background_clip(config, layout)
-    composer.export(video_clip, config.output_path)
+    Returns:
+        Dict with success status, duration, output_path, metadata
+    """
+    # Convert VideoConfig to dict if provided (backward compatibility)
+    if config is not None and item is None:
+        item = _convert_config_to_dict(config)
     
-    return {"status": "success", "path": config.output_path}
+    # Step 1-11: Orchestrate all sub-functions
+    ctx = _prepare_all_context(item)
+    bg_clip = _create_background_clip(ctx)
+    letters_clip = _render_letters_layer(ctx)
+    chinese_clip = _render_chinese_zhuyin_layer(ctx)
+    timer_clip = _render_timer_layer(ctx)
+    reveal_clip = _render_reveal_layer(ctx)
+    progress_clip = _render_progress_bar_layer(ctx)
+    audio_clip = _process_audio_tracks(ctx)
+    entry_clip, ending_clip = _load_entry_ending_clips(ctx)
+    
+    # Filter out stub clips (1x1 size)
+    layers = [bg_clip]
+    for clip in [letters_clip, chinese_clip, timer_clip, reveal_clip, progress_clip]:
+        if clip and hasattr(clip, 'size') and clip.size != (1, 1):
+            layers.append(clip)
+    
+    # Step 11: Compose and export
+    _compose_and_export(ctx, layers, audio_clip, output_path, composer)
+    
+    return {
+        "success": True,
+        "duration": ctx.timeline["total_duration"],
+        "output_path": output_path,
+        "metadata": {...},
+        "status": "rendered",
+    }
+
+
+@dataclass
+class VideoRenderingContext:
+    """Rendering context passed between sub-functions.
+    
+    Contains all computed data needed for video generation:
+    - item: Original configuration dict
+    - config: Parsed VideoConfig
+    - timeline: Timing information (countdown_start, reveal_start, total_duration)
+    - layout: Screen positions (letters_bbox, chinese_bbox, image_bbox, ...)
+    - dry_run: Skip actual rendering
+    - skip_ending: Skip ending video clip
+    """
+    item: Dict[str, Any]
+    config: VideoConfig
+    timeline: Dict[str, float]
+    layout: Dict[str, Any]
+    dry_run: bool
+    skip_ending: bool
 ```
+
+**向後相容**:
+- 舊 API: `from spellvid.utils import render_video_moviepy` (觸發 DeprecationWarning)
+- 新 API: `from spellvid.application.video_service import render_video`
+
+**Phase 3.11 計劃**:
+- 完整實作 9 個存根函數 (目前返回 1x1 ColorClip)
+- 移除 utils.py 中的 render_video_moviepy wrapper
+- 達成 100% contract tests passing
 
 ---
 
