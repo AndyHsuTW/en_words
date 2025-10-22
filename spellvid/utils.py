@@ -1034,6 +1034,9 @@ def render_video_stub(
 ) -> Dict[str, Any]:
     """Render video.
 
+    ⚠️ DEPRECATED: This function will be refactored in a future phase.
+    Use application.video_service.render_video with dry_run=True instead.
+
     Args:
         item: Video configuration dictionary with word, letters, assets.
         out_path: Output file path for the rendered video.
@@ -1050,6 +1053,13 @@ def render_video_stub(
         video after every word. In batch mode, only the last video
         should have skip_ending=False.
     """
+    warnings.warn(
+        "render_video_stub is deprecated. "
+        "Use application.video_service.render_video with dry_run=True.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+
     if use_moviepy and _HAS_MOVIEPY:
         return render_video_moviepy(
             item, out_path, dry_run=dry_run, skip_ending=skip_ending
@@ -1338,10 +1348,10 @@ def render_video_moviepy(
         stacklevel=2
     )
     from spellvid.application.video_service import render_video
-    
+
     # Delegate to new API
     result = render_video(item, out_path, dry_run, skip_ending)
-    
+
     # Convert new format to legacy format for backward compatibility
     return {
         "status": "ok",
