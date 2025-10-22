@@ -15,15 +15,9 @@ from typing import Any, Dict, Optional
 
 # Domain layer imports
 from spellvid.domain.layout import compute_layout_bboxes
-from spellvid.domain.timing import calculate_timeline
 
 # Shared layer imports
 from spellvid.shared.types import VideoConfig
-from spellvid.shared.constants import (
-    CANVAS_WIDTH,
-    CANVAS_HEIGHT,
-    COLOR_WHITE,
-)
 
 # Infrastructure layer imports
 from spellvid.infrastructure.video.interface import IVideoComposer
@@ -174,21 +168,21 @@ def _prepare_all_context(item: Dict[str, Any]) -> VideoRenderingContext:
 
 def _create_background_clip(ctx: VideoRenderingContext) -> Any:
     """Create background clip (image or solid color).
-    
+
     Creates either:
     - Image/video background (if image_path present)
     - Solid color background (if no image)
-    
+
     Args:
         ctx: VideoRenderingContext with item and metadata
-    
+
     Returns:
         MoviePy Clip (ImageClip, VideoFileClip, or ColorClip)
-    
+
     Raises:
         FileNotFoundError: If image_path specified but not found
         RuntimeError: If clip creation fails
-    
+
     Example:
         >>> ctx = _prepare_all_context(item)
         >>> bg_clip = _create_background_clip(ctx)
@@ -203,29 +197,29 @@ def _create_background_clip(ctx: VideoRenderingContext) -> Any:
             import moviepy as mpy  # type: ignore
         except ImportError:
             raise RuntimeError("MoviePy not available")
-    
+
     duration = ctx.timeline["total_duration"]
     video_size = ctx.metadata["video_size"]
     bg_color = ctx.metadata["bg_color"]
-    
+
     # Always create base color clip
     bg_clip = mpy.ColorClip(
         size=video_size,
         color=bg_color,
         duration=duration
     )
-    
+
     # If image/video provided, load and overlay
     img_path = ctx.item.get("image_path", "")
     if img_path and os.path.exists(img_path):
         img_exts = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff")
         vid_exts = (".mp4", ".mov", ".mkv", ".avi", ".webm")
-        
+
         if img_path.lower().endswith(img_exts):
             # Static image - load with Pillow and create ImageClip
             from PIL import Image as PILImage
             import numpy as np
-            
+
             pil_img = PILImage.open(img_path).convert("RGBA")
             # Scale to fit centered region (70% of canvas)
             square_size = int(min(video_size) * 0.7)
@@ -234,23 +228,23 @@ def _create_background_clip(ctx: VideoRenderingContext) -> Any:
             new_w = max(1, int(w0 * scale))
             new_h = max(1, int(h0 * scale))
             pil_img = pil_img.resize((new_w, new_h), PILImage.LANCZOS)
-            
+
             arr = np.array(pil_img)
             img_clip = mpy.ImageClip(arr, duration=duration)
-            
+
             # Center the image
             img_clip = img_clip.with_position(("center", "center"))
-            
+
             # Composite: background + centered image
             bg_clip = mpy.CompositeVideoClip([bg_clip, img_clip])
-            
+
         elif img_path.lower().endswith(vid_exts):
             # Video file - load as VideoFileClip
             vid_clip = mpy.VideoFileClip(img_path)
-            
+
             # Get video mode (cover/contain)
             video_mode = ctx.item.get("video_mode", "cover")
-            
+
             if video_mode == "cover":
                 # Scale to cover entire canvas
                 vid_w, vid_h = vid_clip.size
@@ -269,27 +263,27 @@ def _create_background_clip(ctx: VideoRenderingContext) -> Any:
                 scale = min(scale_w, scale_h)
                 vid_clip = vid_clip.resized(scale)
                 vid_clip = vid_clip.with_position(("center", "center"))
-            
+
             # Loop video if shorter than duration
             if vid_clip.duration < duration:
                 vid_clip = vid_clip.loop(duration=duration)
             else:
                 vid_clip = vid_clip.subclipped(0, duration)
-            
+
             # Composite: background + video
             bg_clip = mpy.CompositeVideoClip([bg_clip, vid_clip])
-    
+
     return bg_clip
 
 
 def _render_letters_layer(ctx: VideoRenderingContext) -> Any:
     """Render letter images in top-left.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with letters_ctx and layout
-    
+
     Returns:
         MoviePy CompositeVideoClip with positioned letter images
     """
@@ -298,23 +292,23 @@ def _render_letters_layer(ctx: VideoRenderingContext) -> Any:
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Load letter images from letters_ctx
     # TODO: Position according to layout["letters"]
     # TODO: Create composite clip
-    
+
     # Stub: return empty clip for now
     return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
 
 
 def _render_chinese_zhuyin_layer(ctx: VideoRenderingContext) -> Any:
     """Render Chinese text + Zhuyin annotations in top-right.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with item (word_zh) and layout
-    
+
     Returns:
         MoviePy ImageClip with rendered text
     """
@@ -323,23 +317,23 @@ def _render_chinese_zhuyin_layer(ctx: VideoRenderingContext) -> Any:
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Parse zhuyin from word_zh
     # TODO: Render Chinese + zhuyin using Pillow
     # TODO: Position according to layout["word_zh"]
-    
+
     # Stub: return empty clip
     return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
 
 
 def _render_timer_layer(ctx: VideoRenderingContext) -> Any:
     """Render countdown timer in top-left corner.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with timeline (countdown_sec)
-    
+
     Returns:
         MoviePy Clip with dynamic countdown text
     """
@@ -348,22 +342,22 @@ def _render_timer_layer(ctx: VideoRenderingContext) -> Any:
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Create timer clips for each second
     # TODO: Position according to layout["timer"]
-    
+
     # Stub: return empty clip
     return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
 
 
 def _render_reveal_layer(ctx: VideoRenderingContext) -> Any:
     """Render word reveal animation (typing effect) in bottom center.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with item (word_en) and timeline
-    
+
     Returns:
         MoviePy Clip with typing animation
     """
@@ -372,23 +366,23 @@ def _render_reveal_layer(ctx: VideoRenderingContext) -> Any:
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Create reveal animation clips
     # TODO: Add underlines
     # TODO: Position according to layout["reveal"]
-    
+
     # Stub: return empty clip
     return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
 
 
 def _render_progress_bar_layer(ctx: VideoRenderingContext) -> Any:
     """Render progress bar at bottom of video.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with timeline (total_duration)
-    
+
     Returns:
         MoviePy Clip with animated progress bar
     """
@@ -397,22 +391,22 @@ def _render_progress_bar_layer(ctx: VideoRenderingContext) -> Any:
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Create progress bar segments
     # TODO: Position at bottom
-    
+
     # Stub: return empty clip
     return mpy.ColorClip(size=(1, 1), color=(0, 0, 0), duration=1.0)
 
 
 def _process_audio_tracks(ctx: VideoRenderingContext) -> Any:
     """Mix background music + countdown beeps.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with item (music_path) and timeline
-    
+
     Returns:
         MoviePy AudioClip (mixed audio)
     """
@@ -421,11 +415,11 @@ def _process_audio_tracks(ctx: VideoRenderingContext) -> Any:
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Load music file
     # TODO: Generate beeps
     # TODO: Mix audio tracks
-    
+
     # Stub: return silent audio
     from moviepy.audio.AudioClip import AudioClip
     return AudioClip(lambda t: [0, 0], duration=ctx.timeline["total_duration"])
@@ -435,20 +429,87 @@ def _load_entry_ending_clips(
     ctx: VideoRenderingContext
 ) -> tuple[Optional[Any], Optional[Any]]:
     """Load optional entry and ending video clips.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with entry_ctx and ending_ctx
-    
+
     Returns:
         Tuple of (entry_clip, ending_clip) - either or both may be None
     """
     # TODO: Load entry video if enabled
     # TODO: Load ending video if enabled
-    
+
     # Stub: return None for both
     return (None, None)
+
+
+def validate_context(ctx: VideoRenderingContext) -> bool:
+    """Validate that VideoRenderingContext has all required fields.
+
+    Args:
+        ctx: VideoRenderingContext to validate
+
+    Returns:
+        True if valid
+
+    Raises:
+        ValueError: If ctx missing required fields or invalid
+    """
+    # Check required fields
+    if not ctx.item:
+        raise ValueError("Context missing item")
+    if not ctx.layout:
+        raise ValueError("Context missing layout")
+    if not ctx.timeline:
+        raise ValueError("Context missing timeline")
+
+    return True
+
+
+def validate_layer(layer: Any) -> bool:
+    """Validate that a layer implementation satisfies Layer protocol.
+
+    Args:
+        layer: Object to validate
+
+    Returns:
+        True if valid
+
+    Raises:
+        TypeError: If layer doesn't satisfy Layer protocol
+    """
+    # Check required methods
+    if not hasattr(layer, 'render'):
+        raise TypeError("Layer must have render() method")
+    if not hasattr(layer, 'get_bbox'):
+        raise TypeError("Layer must have get_bbox() method")
+    if not hasattr(layer, 'get_duration'):
+        raise TypeError("Layer must have get_duration() method")
+
+    return True
+
+
+def validate_composer(composer: Any) -> bool:
+    """Validate that a composer satisfies IVideoComposer protocol.
+
+    Args:
+        composer: Object to validate
+
+    Returns:
+        True if valid
+
+    Raises:
+        TypeError: If composer doesn't satisfy IVideoComposer protocol
+    """
+    # Check required methods
+    if not hasattr(composer, 'compose_layers'):
+        raise TypeError("Composer must have compose_layers() method")
+    if not hasattr(composer, 'export'):
+        raise TypeError("Composer must have export() method")
+
+    return True
 
 
 def _compose_and_export(
@@ -459,16 +520,16 @@ def _compose_and_export(
     composer: Optional[IVideoComposer] = None
 ) -> None:
     """Combine all layers + audio and export to MP4.
-    
+
     TODO: Extract full implementation from render_video_moviepy
-    
+
     Args:
         ctx: VideoRenderingContext with metadata
         layers: List of MoviePy Clips (background, letters, etc.)
         audio: MoviePy AudioClip
         output_path: Output MP4 file path
         composer: IVideoComposer implementation (None = default MoviePy)
-    
+
     Side Effects:
         Writes MP4 file to output_path
     """
@@ -477,20 +538,20 @@ def _compose_and_export(
         from moviepy import editor as mpy  # type: ignore
     except (ImportError, AttributeError):
         import moviepy as mpy  # type: ignore
-    
+
     # TODO: Composite all layers
     # TODO: Set audio
     # TODO: Export to file
-    
+
     # Stub: create simple composite and export
     if layers:
         final_clip = mpy.CompositeVideoClip(layers)
         if audio:
             final_clip = final_clip.with_audio(audio)
-        
+
         # Create output directory
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         # Export (simplified)
         final_clip.write_videofile(
             output_path,
@@ -506,158 +567,128 @@ def _compose_and_export(
 
 
 def render_video(
-    config: VideoConfig,
+    item: Dict[str, Any],
     output_path: str,
     dry_run: bool = False,
     skip_ending: bool = False,
     composer: Optional[IVideoComposer] = None,
 ) -> Dict[str, Any]:
-    """渲染單支視頻
+    """Orchestrate complete video rendering pipeline.
 
-    協調 domain 層(佈局、注音、時間軸)與 infrastructure 層(視頻組合)
-    完成視頻渲染。
+    New implementation that delegates to 11 specialized sub-functions,
+    replacing the monolithic render_video_moviepy (~1,630 lines).
 
     Args:
-        config: 視頻配置
-        output_path: 輸出檔案路徑
-        dry_run: True 則僅計算 metadata 不渲染
-        skip_ending: True 則不加入片尾視頻(批次處理用)
-        composer: IVideoComposer 實作,None 則使用預設 MoviePy
+        item: JSON configuration dict (see SCHEMA in shared.validation)
+        output_path: Output MP4 file path
+        dry_run: If True, only compute metadata without rendering
+        skip_ending: If True, omit ending video (for batch processing)
+        composer: IVideoComposer implementation (None = default MoviePy)
 
     Returns:
-        渲染結果字典:
+        Rendering result dict:
         - success: bool
-        - duration: float (總時長)
+        - duration: float (total duration)
         - output_path: str
-        - metadata: dict (佈局、資源資訊)
+        - metadata: dict (layout, resources, timing)
 
     Raises:
-        FileNotFoundError: 資源檔案不存在(dry_run=False 時)
-        RuntimeError: 渲染失敗
+        ValueError: Invalid item configuration
+        FileNotFoundError: Required assets missing (when dry_run=False)
+        RuntimeError: Rendering failure
 
     Example:
-        >>> config = VideoConfig(
-        ...     letters="I i",
-        ...     word_en="Ice",
-        ...     word_zh="ㄅㄧㄥ 冰"
-        ... )
-        >>> result = render_video(config, "out/ice.mp4", dry_run=True)
+        >>> item = {
+        ...     "letters": "I i",
+        ...     "word_en": "Ice",
+        ...     "word_zh": "冰",
+        ...     "image_path": "assets/ice.png",
+        ...     "music_path": "assets/ice.mp3",
+        ... }
+        >>> result = render_video(item, "out/ice.mp4", dry_run=True)
         >>> result["success"]
         True
     """
-    # Phase 1: Domain 層計算(不依賴外部資源)
-    layout_result = compute_layout_bboxes(config)
+    # Step 1: Prepare all context data upfront
+    # (layout, timeline, entry/ending/letters contexts, metadata)
+    ctx = _prepare_all_context(item)
 
-    # 計算主視頻時長(簡化版本:countdown + 每字母1秒 + reveal_hold)
-    per_letter_time = 1.0
-    reveal_time = len(config.word_en) * per_letter_time
-    main_duration = config.countdown_sec + reveal_time + config.reveal_hold_sec
-
-    # 計算時間軸
-    timeline = calculate_timeline(
-        video_duration=main_duration,
-        fadeout_duration=0.0,  # 簡化版本暫不處理淡出
-    )
-
-    # 計算總時長
-    entry_duration = 0.0  # 簡化版本暫不處理片頭
-    ending_duration = 0.0 if skip_ending else 0.0  # 簡化版本暫不處理片尾
-
-    total_duration = entry_duration + main_duration + ending_duration
-
-    # 建立 metadata
-    metadata = {
-        "layout": layout_result.to_dict(),  # 使用 to_dict() 轉換
-        "timeline": timeline,
-        "config": {
-            "letters": config.letters,
-            "word_en": config.word_en,
-            "word_zh": config.word_zh,
-            "countdown_sec": config.countdown_sec,
-            "reveal_hold_sec": config.reveal_hold_sec,
-        },
-        "duration": {
-            "entry": entry_duration,
-            "main": main_duration,
-            "ending": ending_duration,
-            "total": total_duration,
-        },
-    }
-
-    # Dry-run 模式:僅回傳 metadata
+    # Dry-run mode: return metadata without rendering
     if dry_run:
         return {
             "success": True,
-            "duration": total_duration,
+            "duration": ctx.timeline["total_duration"],
             "output_path": output_path,
-            "metadata": metadata,
+            "metadata": {
+                "layout": ctx.layout,
+                "timeline": ctx.timeline,
+                "config": ctx.item,
+            },
             "status": "dry-run",
         }
 
-    # Phase 2: Infrastructure 層渲染(需要外部資源)
-    if composer is None:
-        # 使用預設 MoviePy adapter
-        from spellvid.infrastructure.video.moviepy_adapter import (
-            MoviePyAdapter,
-        )
-        composer = MoviePyAdapter()
+    # Step 2: Create background clip (image/video or solid color)
+    bg_clip = _create_background_clip(ctx)
 
-    # 檢查資源檔案(簡化版本:僅檢查必要資源)
-    if config.image_path and not Path(config.image_path).exists():
-        raise FileNotFoundError(f"Image file not found: {config.image_path}")
+    # Step 3: Render letters layer (top-left letter images)
+    letters_clip = _render_letters_layer(ctx)
 
-    # 建立輸出目錄
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    # Step 4: Render Chinese + Zhuyin layer (top-right)
+    chinese_clip = _render_chinese_zhuyin_layer(ctx)
 
-    # 組裝視頻 clips(簡化版本:僅建立背景)
-    # 完整實作需要:
-    # 1. 建立背景色 clip
-    # 2. 建立圖片 clip
-    # 3. 建立文字 clips(letters, word_en, word_zh, zhuyin, timer)
-    # 4. 建立進度條 clips
-    # 5. 組合所有 clips
-    # 6. 套用淡出效果
-    # 7. 渲染到檔案
+    # Step 5: Render timer layer (countdown in top-left corner)
+    timer_clip = _render_timer_layer(ctx)
 
-    try:
-        # 簡化實作:建立基本背景視頻
-        background_clip = composer.create_color_clip(
-            size=(CANVAS_WIDTH, CANVAS_HEIGHT),
-            color=COLOR_WHITE,
-            duration=total_duration,
-        )
+    # Step 6: Render reveal layer (typing animation in bottom center)
+    reveal_clip = _render_reveal_layer(ctx)
 
-        # 組合 clips(目前僅背景)
-        final_clip = composer.compose_clips(
-            clips=[background_clip],
-            size=(CANVAS_WIDTH, CANVAS_HEIGHT),
-        )
+    # Step 7: Render progress bar layer (bottom of video)
+    progress_clip = _render_progress_bar_layer(ctx)
 
-        # 套用淡出效果(簡化版本:跳過)
-        # if config.fadeout_sec > 0:
-        #     final_clip = composer.apply_fadeout(
-        #         clip=final_clip,
-        #         duration=config.fadeout_sec,
-        #     )
+    # Step 8: Process audio tracks (music + countdown beeps)
+    audio_clip = _process_audio_tracks(ctx)
 
-        # 渲染到檔案
-        composer.render_to_file(
-            clip=final_clip,
-            output_path=output_path,
-            fps=30,  # 預設 30 fps
-            codec="libx264",
-        )
+    # Step 9: Load optional entry and ending clips
+    entry_clip, ending_clip = _load_entry_ending_clips(ctx)
 
-        return {
-            "success": True,
-            "duration": total_duration,
-            "output_path": output_path,
-            "metadata": metadata,
-            "status": "rendered",
-        }
+    # Step 10: Collect all layers for composition
+    layers = [bg_clip]
 
-    except Exception as e:
-        raise RuntimeError(f"Failed to render video: {e}")
+    # Add main content layers (only if not stub clips)
+    if letters_clip and hasattr(letters_clip, 'size'):
+        if letters_clip.size != (1, 1):  # Skip stub clips
+            layers.append(letters_clip)
+
+    if chinese_clip and hasattr(chinese_clip, 'size'):
+        if chinese_clip.size != (1, 1):
+            layers.append(chinese_clip)
+
+    if timer_clip and hasattr(timer_clip, 'size'):
+        if timer_clip.size != (1, 1):
+            layers.append(timer_clip)
+
+    if reveal_clip and hasattr(reveal_clip, 'size'):
+        if reveal_clip.size != (1, 1):
+            layers.append(reveal_clip)
+
+    if progress_clip and hasattr(progress_clip, 'size'):
+        if progress_clip.size != (1, 1):
+            layers.append(progress_clip)
+
+    # Step 11: Compose and export final video
+    _compose_and_export(ctx, layers, audio_clip, output_path, composer)
+
+    return {
+        "success": True,
+        "duration": ctx.timeline["total_duration"],
+        "output_path": output_path,
+        "metadata": {
+            "layout": ctx.layout,
+            "timeline": ctx.timeline,
+            "config": ctx.item,
+        },
+        "status": "rendered",
+    }
 
 
 def _validate_resources(config: VideoConfig) -> Dict[str, Any]:
