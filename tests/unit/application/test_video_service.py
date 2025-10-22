@@ -366,9 +366,9 @@ def test_render_video_orchestration_handles_skip_ending(
     mock_entry_ending = mocker.patch(
         'spellvid.application.video_service._load_entry_ending_clips'
     )
-    
+
     from spellvid.application.video_service import VideoRenderingContext
-    
+
     mock_ctx = VideoRenderingContext(
         item={"letters": "C c", "word_en": "Cat", "word_zh": "貓"},
         layout={"letters": [], "word_zh": {}, "timer": {}, "reveal": {}},
@@ -380,7 +380,7 @@ def test_render_video_orchestration_handles_skip_ending(
     )
     mock_prepare.return_value = mock_ctx
     mock_entry_ending.return_value = (None, None)  # Add missing return value
-    
+
     item = {
         "letters": "C c",
         "word_en": "Cat",
