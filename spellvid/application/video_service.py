@@ -622,12 +622,12 @@ def render_video(
             "countdown_sec": config.countdown_sec,
             "reveal_hold_sec": config.reveal_hold_sec,
         }
-    
+
     if item is None:
         raise ValueError(
             "Either 'item' dict or 'config' VideoConfig must be provided"
         )
-    
+
     # Step 1: Prepare all context data upfront
     # (layout, timeline, entry/ending/letters contexts, metadata)
     ctx = _prepare_all_context(item)
